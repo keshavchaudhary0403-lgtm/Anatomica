@@ -4,6 +4,7 @@ export interface Landmark { n: string; p: [number, number, number] }
 export interface Structure {
   id: string;
   name: string;
+  dkey: string; // lookup key for descriptions (the model's original name, lower case)
   side: 'left' | 'right' | null;
   sys: SystemId;
   tissue: string;
@@ -72,6 +73,11 @@ export function colorKey(s: Structure) {
 let cache: Promise<Structure[]> | null = null;
 export function loadStructures() {
   cache ??= fetch('/data/structures.json').then((r) => r.json()).then((list: Structure[]) => {
+    for (const s of list) {
+      s.dkey = s.name.toLowerCase();
+      // The source drops a closing bracket: "Facial nerve (VII" -> "Facial nerve (VII)".
+      if ((s.name.match(/\(/g) || []).length > (s.name.match(/\)/g) || []).length) s.name += ')';
+    }
     // Z-Anatomy labels mostly the right side; mirror landmarks onto the left partner.
     const byName = new Map<string, Structure>();
     for (const s of list) if (s.side === 'right') byName.set(`${s.sys}/${s.name}`, s);

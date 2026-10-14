@@ -13,6 +13,8 @@ Clinical 3D anatomy for an MBBS intern: the whole body in layers, with clinical 
 - **X-ray** fades everything except the selection. **Section** cuts the body axially, sagittally or coronally.
 - **Isolate** shows only the selected structure; **Show all** brings everything back.
 - **Saved views** (bookmark icon) keep the angle, layers and selection.
+- **Procedures** (dock): 13 bedside procedures. Each shows the target (amber), landmarks (teal) and structures at risk (red) on the model, with steps and common mistakes.
+- **Revise** (dock): identify-the-structure questions and NEET PG style MCQs by region, with spaced repetition. Progress is kept on the device.
 
 ## Develop
 
@@ -29,7 +31,9 @@ Deploy: import the repo in Vercel (framework preset: Vite). No server or keys ne
 - `public/models/*.glb` — one compressed model per system, built by `tools/build-models.mjs`.
 - `public/data/structures.json` — every structure with its system, tissue, group and landmarks.
 - `public/data/descriptions.json` — short overviews, built by `tools/build-descriptions.mjs`.
-- `src/clinical.ts` — clinical, NEET PG and procedure notes. Add entries here, keyed by structure name. These are drafts and should be checked against BD Chaurasia or Gray's.
+- `src/content/*.ts` — clinical and NEET PG notes by region, keyed by structure name. Muscle parts ("Long head of biceps brachii") share their muscle's entry automatically. These are drafts and should be checked against BD Chaurasia or Gray's.
+- `src/content/procedures.ts` — procedure guides.
+- `src/content/questions.ts` — MCQs.
 
 ### Rebuilding the models
 

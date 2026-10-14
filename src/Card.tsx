@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CLINICAL } from './clinical';
+import { clinicalFor } from './content';
 import { loadDescriptions, SYSTEMS, TISSUE } from './data';
 import * as Icon from './icons';
 import { byId } from './index-cache';
@@ -17,11 +17,12 @@ export function Card() {
   useEffect(() => { loadDescriptions().then(setDesc); }, []);
 
   const s = selected ? byId.get(selected) : null;
-  const clin = s ? CLINICAL[s.name] : undefined;
+  const found = s ? clinicalFor(s.name) : null;
+  const clin = found?.note;
   useEffect(() => { setTab(clin ? 'clinical' : 'overview'); }, [selected]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!s) return null;
 
-  const d = desc[s.name.toLowerCase()];
+  const d = desc[s.dkey];
   const sys = SYSTEMS.find((x) => x.id === s.sys)!;
   const st = useStore.getState();
   const isolatedHere = !!isolated?.has(s.id);
@@ -63,6 +64,7 @@ export function Card() {
       <div className="card-body">
         {tab === 'clinical' && clin && (
           <>
+            {found && found.key !== s.name && <p className="muted small">Notes for {found.key}</p>}
             {clin.procedure && <p className="proc">Procedure site: {clin.procedure}</p>}
             {clin.supply?.map((x) => (
               <div className="kv" key={x.label}><span>{x.label}</span><p>{x.text}</p></div>

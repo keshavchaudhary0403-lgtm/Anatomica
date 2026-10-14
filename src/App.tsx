@@ -1,6 +1,8 @@
 import { useProgress } from '@react-three/drei';
 import { useEffect, useRef, useState } from 'react';
 import { Card } from './Card';
+import { ProcedurePanel, ProcedurePicker } from './ProcedurePanel';
+import { QuizPanel } from './QuizPanel';
 import { SYSTEMS, type Structure } from './data';
 import * as Icon from './icons';
 import { ready } from './index-cache';
@@ -108,11 +110,12 @@ function Views() {
   );
 }
 
-function Dock() {
+function Dock({ onProcedures }: { onProcedures: () => void }) {
   const xray = useStore((s) => s.xray);
   const spin = useStore((s) => s.spin);
   const section = useStore((s) => s.section);
-  const changed = useStore((s) => s.hidden.size > 0 || !!s.isolated);
+  const proc = useStore((s) => s.proc);
+  const quiz = useStore((s) => s.quiz);
   const st = useStore.getState;
   return (
     <div className="dock" role="toolbar" aria-label="View tools">
@@ -120,7 +123,9 @@ function Dock() {
       <button className={xray ? 'on' : ''} aria-pressed={xray} onClick={() => st().set({ xray: !xray })}><Icon.Xray /><span>X-ray</span></button>
       <button className={section.on ? 'on' : ''} aria-pressed={section.on} onClick={() => st().set({ section: { ...section, on: !section.on } })}><Icon.Slice /><span>Section</span></button>
       <button className={spin ? 'on' : ''} aria-pressed={spin} onClick={() => st().set({ spin: !spin })}><Icon.Rotate /><span>Turn</span></button>
-      {changed && <button onClick={() => st().showAll()}><Icon.Eye /><span>Show all</span></button>}
+      <span className="dock-sep" aria-hidden="true" />
+      <button className={proc ? 'on' : ''} onClick={onProcedures}><Icon.Syringe /><span>Procedures</span></button>
+      <button className={quiz ? 'on' : ''} aria-pressed={!!quiz} onClick={() => st().set(quiz ? { quiz: null, focusList: null } : { quiz: { highlight: null }, selected: null })}><Icon.Cards /><span>Revise</span></button>
     </div>
   );
 }
@@ -163,12 +168,16 @@ export default function App() {
   const [list, setList] = useState<Structure[]>([]);
   const skeletonLoading = useStore((s) => s.loading.skeleton);
   const selected = useStore((s) => s.selected);
+  const proc = useStore((s) => s.proc);
+  const quiz = useStore((s) => s.quiz);
+  const [picking, setPicking] = useState(false);
   useEffect(() => { ready.then(setList); }, []);
+  const panel = quiz ? 'quiz' : selected ? 'card' : proc ? 'proc' : null;
   const done = list.length > 0 && skeletonLoading === false;
   const touch = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
 
   return (
-    <div className={`app${selected ? ' has-card' : ''}`}>
+    <div className={`app${panel ? ' has-card' : ''}`}>
       <div className="stage" aria-hidden="true" />
       {list.length > 0 && <Viewer />}
       <header className="top">
@@ -179,11 +188,14 @@ export default function App() {
         <div className="top-right"><ThemeButton /><Views /></div>
       </header>
       <Layers />
-      <Card />
+      {panel === 'card' && <Card />}
+      {panel === 'proc' && <ProcedurePanel />}
+      {panel === 'quiz' && <QuizPanel />}
       <FilterBar />
       <SectionPanel />
-      <Dock />
-      {!selected && done && <p className="hint">{touch ? 'Drag to turn. Pinch to zoom, two fingers to move.' : 'Drag to turn. Scroll to zoom. Right-drag or two-finger swipe to move.'}</p>}
+      <Dock onProcedures={() => setPicking(true)} />
+      {picking && <ProcedurePicker onClose={() => setPicking(false)} />}
+      {!panel && done && <p className="hint">{touch ? 'Drag to turn. Pinch to zoom, two fingers to move.' : 'Drag to turn. Scroll to zoom. Right-drag or two-finger swipe to move.'}</p>}
       <Hover />
       <Search list={list} />
       <Splash done={done} />

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Landmark, SystemId } from './data';
+import type { Role } from './content/procedures';
 
 export type Axis = 'y' | 'x' | 'z';
 export interface SavedView { name: string; cam: number[]; target: number[]; visible: SystemId[]; selected: string | null }
@@ -17,6 +18,10 @@ interface State {
   section: { on: boolean; axis: Axis; pos: number; flip: boolean };
   landmark: Landmark | null;
   focusReq: number; // bump to fly camera to selection
+  focusList: string[] | null; // when set, frame these instead of the selection
+  focusDir: [number, number, number] | null; // and look from this direction
+  proc: { id: string; step: number; roles: Map<string, Role>; faint: Set<string>; context: Set<SystemId>; before: Record<SystemId, boolean> } | null;
+  quiz: { highlight: string | null } | null;
   partsV: number; // bumps when a system's meshes finish loading
   resetReq: number;
   searchOpen: boolean;
@@ -51,6 +56,10 @@ export const useStore = create<State>((set, get) => ({
   section: { on: false, axis: 'y', pos: 0.5, flip: false },
   landmark: null,
   focusReq: 0,
+  focusList: null,
+  focusDir: null,
+  proc: null,
+  quiz: null,
   partsV: 0,
   resetReq: 0,
   searchOpen: false,
@@ -62,11 +71,11 @@ export const useStore = create<State>((set, get) => ({
     if (id) {
       const sys = id.split('/')[0] as SystemId;
       const hidden = new Set(get().hidden); hidden.delete(id);
-      set((s) => ({ selected: id, landmark: null, hidden, visible: { ...s.visible, [sys]: true }, focusReq: fly ? s.focusReq + 1 : s.focusReq }));
+      set((s) => ({ selected: id, landmark: null, hidden, visible: { ...s.visible, [sys]: true }, focusList: fly ? null : s.focusList, focusDir: fly ? null : s.focusDir, focusReq: fly ? s.focusReq + 1 : s.focusReq }));
     } else set({ selected: null, landmark: null });
   },
   hide: (id) => set((s) => { const h = new Set(s.hidden); h.add(id); return { hidden: h, hideLog: [...s.hideLog, id], selected: s.selected === id ? null : s.selected, landmark: null }; }),
-  isolate: (id) => set((s) => ({ isolated: new Set([id]), selected: id, focusReq: s.focusReq + 1 })),
+  isolate: (id) => set((s) => ({ isolated: new Set([id]), selected: id, focusList: null, focusDir: null, focusReq: s.focusReq + 1 })),
   unisolate: () => set({ isolated: null }),
   undoHide: () => set((s) => {
     const log = s.hideLog.slice(); const last = log.pop();

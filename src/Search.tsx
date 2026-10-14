@@ -1,6 +1,6 @@
 import Fuse from 'fuse.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CLINICAL } from './clinical';
+import { hasClinical } from './content';
 import { SYSTEMS, TISSUE, type Structure } from './data';
 import { useStore } from './store';
 
@@ -24,7 +24,7 @@ export function Search({ list }: { list: Structure[] }) {
   useEffect(() => { if (open) { setQ(''); setI(0); setTimeout(() => input.current?.focus(), 30); } }, [open]);
 
   const results = useMemo(() => {
-    if (!q.trim()) return list.filter((s) => CLINICAL[s.name] && s.side !== 'left').slice(0, 30);
+    if (!q.trim()) return list.filter((s) => hasClinical(s.name) && s.side !== 'left').slice(0, 60);
     return fuse.search(q, { limit: 40 }).map((r) => r.item);
   }, [q, fuse, list]);
 
@@ -52,7 +52,7 @@ export function Search({ list }: { list: Structure[] }) {
               <button className={k === i ? 'on' : ''} onMouseEnter={() => setI(k)} onClick={() => choose(s)}>
                 <span className="dot" style={{ background: TISSUE[s.tissue]?.color }} />
                 <span className="r-name">{s.name}{s.side ? <em> {s.side}</em> : null}</span>
-                {CLINICAL[s.name] && <span className="tag">Notes</span>}
+                {hasClinical(s.name) && <span className="tag">Notes</span>}
                 <span className="r-sys">{SYSTEMS.find((x) => x.id === s.sys)?.label}</span>
               </button>
             </li>

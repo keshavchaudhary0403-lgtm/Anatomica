@@ -43,6 +43,26 @@ const allParts = () => [...parts.values()].flat();
 if (import.meta.env.DEV) Object.assign(window, { __parts: parts });
 const bodyBox = new THREE.Box3(new THREE.Vector3(-0.34, 0, -0.15), new THREE.Vector3(0.34, 1.75, 0.15));
 
+// Procedure roles: target (amber), landmark (teal), at risk (red).
+export const ROLE_COLOR = { target: '#f2a65a', landmark: '#3fc6c0', risk: '#ff4d5e' } as const;
+const roleMats = new Map<string, THREE.MeshStandardMaterial>();
+function roleMat(role: keyof typeof ROLE_COLOR, tissue: string, faint = false) {
+  const k = role + '|' + tissue + (faint ? '|f' : '');
+  let m = roleMats.get(k);
+  if (!m) {
+    const c = new THREE.Color(ROLE_COLOR[role]);
+    m = mat('base', tissue).clone();
+    m.transparent = false; m.opacity = 1; m.depthWrite = true;
+    m.color.lerp(c, 0.8); m.emissive = c; m.emissiveIntensity = 0.32;
+    if (faint) { m.transparent = true; m.opacity = 0.16; m.depthWrite = false; m.emissiveIntensity = 0.15; }
+    m.clippingPlanes = clipList;
+    roleMats.set(k, m);
+  }
+  return m;
+}
+const roleOverlay = Object.fromEntries(Object.entries(ROLE_COLOR).map(([k, c]) => [k,
+  new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.2, depthTest: false, depthWrite: false, clippingPlanes: clipList })])) as Record<keyof typeof ROLE_COLOR, THREE.MeshBasicMaterial>;
+
 // A faint amber copy of the selection drawn on top of everything, so it can be found even when covered.
 const overlayMat = new THREE.MeshBasicMaterial({ color: SELECT, transparent: true, opacity: 0.28, depthTest: false, depthWrite: false, clippingPlanes: clipList });
 const overlays: THREE.Mesh[] = [];
@@ -52,14 +72,19 @@ function applyState() {
   overlays.splice(0).forEach((o) => o.removeFromParent());
   for (const p of allParts()) {
     const sysOn = s.visible[p.sys];
-    const show = sysOn && !s.hidden.has(p.id) && (!s.isolated || s.isolated.has(p.id));
+    const role = s.proc?.roles.get(p.id);
+    const inProc = !s.proc || role || s.proc.context.has(p.sys);
+    const quizHit = s.quiz?.highlight === p.id;
+    const show = sysOn && !s.hidden.has(p.id) && (!s.isolated || s.isolated.has(p.id)) && !!inProc;
     p.mesh.visible = show;
     if (!show) continue;
     const t = p.mesh.userData.t as string;
-    p.mesh.material = p.id === s.selected ? mat('glow', t) : s.xray ? mat('ghost', t) : mat('base', t);
-    p.mesh.renderOrder = p.id === s.selected ? 2 : s.xray ? 1 : 0;
-    if (p.id === s.selected) {
-      const o = new THREE.Mesh(p.mesh.geometry, overlayMat);
+    const sel = p.id === s.selected || quizHit;
+    const faint = !!s.proc?.faint.has(p.id);
+    p.mesh.material = sel ? mat('glow', t) : role ? roleMat(role, t, faint) : s.xray ? mat('ghost', t) : mat('base', t);
+    p.mesh.renderOrder = sel ? 2 : role ? (faint ? 3 : 1.5) : s.xray ? 1 : 0;
+    if (sel || (role && !faint)) {
+      const o = new THREE.Mesh(p.mesh.geometry, sel ? overlayMat : roleOverlay[role!]);
       o.renderOrder = 10; o.raycast = () => {};
       p.mesh.add(o); overlays.push(o);
     }
@@ -122,7 +147,7 @@ function Loader({ id }: { id: SystemId }) {
 function StateSync() {
   const invalidate = useThree((t) => t.invalidate);
   useEffect(() => useStore.subscribe((s, p) => {
-    if (s.visible !== p.visible || s.selected !== p.selected || s.hidden !== p.hidden || s.isolated !== p.isolated || s.xray !== p.xray || s.section !== p.section) {
+    if (s.visible !== p.visible || s.selected !== p.selected || s.hidden !== p.hidden || s.isolated !== p.isolated || s.xray !== p.xray || s.section !== p.section || s.proc !== p.proc || s.quiz !== p.quiz) {
       applyState(); invalidate();
     }
   }), [invalidate]);
@@ -177,6 +202,7 @@ function Interaction() {
       const quick = performance.now() - down.t < 450;
       down = null;
       if (moved > 6 || !quick) return;
+      if (useStore.getState().quiz) return; // tapping would reveal the answer
       const id = pick(e.clientX, e.clientY, el, camera);
       // Touch screens do not reliably send dblclick, so detect a double tap here.
       const now = performance.now();
@@ -186,11 +212,12 @@ function Interaction() {
     };
     const onCancel = () => { fingers = Math.max(0, fingers - 1); if (fingers === 0) { multi = false; down = null; } };
     const onDbl = (e: MouseEvent) => {
+      if (useStore.getState().quiz) return;
       const id = pick(e.clientX, e.clientY, el, camera);
       if (id) useStore.getState().select(id, true);
     };
     const onMove = (e: PointerEvent) => {
-      if (e.pointerType !== 'mouse' || e.buttons) return;
+      if (e.pointerType !== 'mouse' || e.buttons || useStore.getState().quiz) return;
       clearTimeout(hoverTimer);
       useStore.getState().set({ hovered: null });
       hoverTimer = window.setTimeout(() => {
@@ -374,15 +401,18 @@ function CameraRig() {
   useEffect(() => { pending.current = focusReq; }, [focusReq]);
   useEffect(() => {
     if (!pending.current || !controls) return;
-    const id = useStore.getState().selected;
-    const p = allParts().filter((q) => q.id === id);
-    if (!p.length) return; // system still loading; retried when partsV bumps
+    const st = useStore.getState();
+    const ids = st.focusList ?? (st.selected ? [st.selected] : []);
+    const p = allParts().filter((q) => ids.includes(q.id));
+    const found = new Set(p.map((q) => q.id));
+    const stillLoading = Object.values(st.loading).some(Boolean);
+    if (!p.length || (found.size < ids.length && stillLoading)) return; // retried when partsV bumps
     pending.current = 0;
     const box = new THREE.Box3();
     p.forEach((q) => box.expandByObject(q.mesh));
     const sphere = box.getBoundingSphere(new THREE.Sphere());
-    const dir = camera.position.clone().sub(controls.target).normalize();
-    const dist = THREE.MathUtils.clamp(sphere.radius * 4.8, 0.25, 3.2);
+    const dir = st.focusDir ? new THREE.Vector3(...st.focusDir).normalize() : camera.position.clone().sub(controls.target).normalize();
+    const dist = THREE.MathUtils.clamp(sphere.radius * (st.focusList ? 3.6 : 4.8), 0.25, 3.2);
     fly(sphere.center.clone(), sphere.center.clone().add(dir.multiplyScalar(dist)));
   }, [focusReq, partsV, controls]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (resetReq) fly(HOME.target.clone(), HOME.cam.clone()); }, [resetReq]); // eslint-disable-line react-hooks/exhaustive-deps

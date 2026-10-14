@@ -17,4 +17,6 @@ export const Expand = () => <I d={<path d="M8 4H4v4M16 4h4v4M8 20H4v-4M16 20h4v-
 export const Sun = () => <I d={<><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4" /></>} />;
 export const Moon = () => <I d={<path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10Z" />} />;
 export const Undo = () => <I d={<><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></>} />;
+export const Syringe = () => <I d={<><path d="m18 2 4 4M15 5l4 4M17 7l-9.5 9.5-3-3L14 4" /><path d="m4.5 13.5-2 2M7 17l-3 3M9.5 11.5l2 2" /></>} />;
+export const Cards = () => <I d={<><rect x="3.5" y="6" width="13" height="15" rx="2.5" /><path d="M8 3h10.5A2.5 2.5 0 0 1 21 5.5V17" /></>} />;
 export const Rotate = () => <I d={<><ellipse cx="12" cy="12" rx="9" ry="3.6" /><path d="M12 3v18" strokeDasharray="2 2.5" /></>} />;

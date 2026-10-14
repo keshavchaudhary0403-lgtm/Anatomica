@@ -40,7 +40,7 @@ function mat(kind: 'base' | 'glow' | 'ghost', tissue: string) {
 interface Part { mesh: THREE.Mesh; id: string; tissue: string; sys: SystemId }
 const parts = new Map<SystemId, Part[]>();
 const allParts = () => [...parts.values()].flat();
-if (import.meta.env.DEV) (window as unknown as { __parts: typeof parts }).__parts = parts;
+if (import.meta.env.DEV) Object.assign(window, { __parts: parts });
 const bodyBox = new THREE.Box3(new THREE.Vector3(-0.34, 0, -0.15), new THREE.Vector3(0.34, 1.75, 0.15));
 
 // A faint amber copy of the selection drawn on top of everything, so it can be found even when covered.
@@ -132,6 +132,9 @@ function StateSync() {
 // ---------- picking ----------
 const raycaster = new THREE.Raycaster();
 function pick(x: number, y: number, el: HTMLElement, camera: THREE.Camera) {
+  return pickHit(x, y, el, camera)?.id ?? null;
+}
+function pickHit(x: number, y: number, el: HTMLElement, camera: THREE.Camera): { id: string; point: THREE.Vector3 } | null {
   const r = el.getBoundingClientRect();
   raycaster.setFromCamera(new THREE.Vector2(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1), camera);
   const cands = allParts().filter((p) => p.mesh.visible);
@@ -149,7 +152,7 @@ function pick(x: number, y: number, el: HTMLElement, camera: THREE.Camera) {
   const clip = clipList[0];
   for (const h of hits) {
     if (clip && clip.distanceToPoint(h.point) < 0) continue;
-    return h.object.userData.sid as string;
+    return { id: h.object.userData.sid as string, point: h.point.clone() };
   }
   return null;
 }
@@ -160,7 +163,7 @@ function Interaction() {
     const el = gl.domElement;
     let down: { x: number; y: number; t: number } | null = null;
     let hoverTimer = 0;
-    const onDown = (e: PointerEvent) => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; };
+    const onDown = (e: PointerEvent) => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; clearTimeout(hoverTimer); useStore.getState().set({ hovered: null }); };
     const onUp = (e: PointerEvent) => {
       if (!down) return;
       const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
@@ -195,6 +198,118 @@ function Interaction() {
       el.removeEventListener('pointerleave', onLeave);
     };
   }, [gl, camera]);
+  return null;
+}
+
+// ---------- zoom toward the point under the cursor or fingers ----------
+// Camera and orbit target both move toward that point by the same factor, so the point
+// stays put on screen and becomes the new centre of rotation as you zoom in.
+function ZoomToPoint() {
+  const { gl, camera, invalidate } = useThree();
+  const controls = useThree((t) => t.controls) as unknown as OrbitImpl | null;
+  useEffect(() => {
+    if (!controls) return;
+    const el = gl.domElement;
+    const MIN = 0.035, MAX = 7;
+
+    const anchor = (x: number, y: number) => {
+      const hit = pickHit(x, y, el, camera);
+      if (hit) return hit.point;
+      // Nothing under the pointer: use the point on that ray at the current target depth.
+      const r = el.getBoundingClientRect();
+      const ndc = new THREE.Vector2(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1);
+      raycaster.setFromCamera(ndc, camera);
+      const depth = camera.position.distanceTo(controls.target);
+      return raycaster.ray.at(depth, new THREE.Vector3());
+    };
+    const zoom = (p: THREE.Vector3, scale: number) => {
+      const dist = camera.position.distanceTo(controls.target);
+      const s = THREE.MathUtils.clamp(scale, MIN / dist, MAX / dist);
+      camera.position.sub(p).multiplyScalar(s).add(p);
+      controls.target.sub(p).multiplyScalar(s).add(p);
+      controls.update(); invalidate();
+    };
+
+    // Last point zoomed into on a structure: the turning centre when a drag starts on empty space.
+    let lastAnchor: THREE.Vector3 | null = null;
+    let wheelAnchor: THREE.Vector3 | null = null; let wheelTimer = 0;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      if (!wheelAnchor) {
+        const hit = pickHit(e.clientX, e.clientY, el, camera);
+        wheelAnchor = hit ? hit.point : anchor(e.clientX, e.clientY);
+        if (hit) lastAnchor = hit.point;
+      }
+      clearTimeout(wheelTimer); wheelTimer = window.setTimeout(() => { wheelAnchor = null; }, 260);
+      const d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+      zoom(wheelAnchor, Math.exp(THREE.MathUtils.clamp(d, -120, 120) * 0.0016));
+    };
+
+    // ---- turning: orbit camera and target together around the point you grab ----
+    const up = new THREE.Vector3(0, 1, 0);
+    let drag: { id: number; x: number; y: number; pivot: THREE.Vector3 } | null = null;
+    const turn = (dx: number, dy: number, pivot: THREE.Vector3) => {
+      const k = (2 * Math.PI / el.clientHeight) * 0.6;
+      const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+      const q = new THREE.Quaternion().setFromAxisAngle(up, -dx * k);
+      const pitch = new THREE.Quaternion().setFromAxisAngle(right, -dy * k);
+      const fwd = controls.target.clone().sub(camera.position).normalize().applyQuaternion(pitch);
+      if (Math.abs(fwd.dot(up)) < 0.985) q.multiply(pitch); // stop short of looking straight up or down
+      camera.position.sub(pivot).applyQuaternion(q).add(pivot);
+      controls.target.sub(pivot).applyQuaternion(q).add(pivot);
+      controls.update(); invalidate();
+    };
+
+    // ---- pinch: zoom toward the point between the fingers ----
+    const touches = new Map<number, { x: number; y: number }>();
+    let pinch: { dist: number; p: THREE.Vector3 } | null = null;
+    const spread = () => { const [a, b] = [...touches.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+
+    const onDown = (e: PointerEvent) => {
+      if (e.pointerType === 'touch') touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touches.size === 2) {
+        drag = null;
+        const [a, b] = [...touches.values()];
+        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        const hit = pickHit(mx, my, el, camera);
+        if (hit) lastAnchor = hit.point;
+        pinch = { dist: spread(), p: hit ? hit.point : anchor(mx, my) };
+        return;
+      }
+      if (!e.isPrimary || e.button !== 0) return;
+      const hit = pickHit(e.clientX, e.clientY, el, camera);
+      drag = { id: e.pointerId, x: e.clientX, y: e.clientY, pivot: hit ? hit.point : (lastAnchor ?? controls.target.clone()) };
+      useStore.getState().set({ spin: false });
+    };
+    const onMove = (e: PointerEvent) => {
+      if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinch && touches.size === 2) {
+        const d = spread();
+        if (d > 0) zoom(pinch.p, pinch.dist / d);
+        pinch.dist = d;
+        return;
+      }
+      if (drag && e.pointerId === drag.id) {
+        turn(e.clientX - drag.x, e.clientY - drag.y, drag.pivot);
+        drag.x = e.clientX; drag.y = e.clientY;
+      }
+    };
+    const onUp = (e: PointerEvent) => {
+      touches.delete(e.pointerId);
+      if (touches.size < 2) pinch = null;
+      if (drag && e.pointerId === drag.id) drag = null;
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('pointerdown', onDown);
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerup', onUp);
+    el.addEventListener('pointercancel', onUp);
+    return () => {
+      el.removeEventListener('wheel', onWheel); el.removeEventListener('pointerdown', onDown);
+      el.removeEventListener('pointermove', onMove); el.removeEventListener('pointerup', onUp); el.removeEventListener('pointercancel', onUp);
+    };
+  }, [gl, camera, controls, invalidate]);
   return null;
 }
 
@@ -327,7 +442,8 @@ export function Viewer() {
         <Suspense key={id} fallback={<Loader id={id} />}><SystemModel id={id} /></Suspense>
       ) : null))}
       <LandmarkPin />
-      <OrbitControls makeDefault target={HOME.target} enableDamping dampingFactor={0.12} minDistance={0.12} maxDistance={7} zoomSpeed={0.9} rotateSpeed={0.75} autoRotate={spin} autoRotateSpeed={0.9} />
+      <OrbitControls makeDefault target={HOME.target} enableDamping dampingFactor={0.12} enableZoom={false} enableRotate={false} minDistance={0.03} maxDistance={7.5} panSpeed={0.9} autoRotate={spin} autoRotateSpeed={0.9} />
+      <ZoomToPoint />
       <Spin />
       <ViewOffset />
       <CameraRig />

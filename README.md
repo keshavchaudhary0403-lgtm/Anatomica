@@ -6,6 +6,9 @@ Clinical 3D anatomy for an MBBS intern: the whole body in layers, with clinical 
 
 - **Layers** (left, or the strip under the top bar on a phone): tap to show or hide; hold to show only that layer.
 - **Tap** a structure to open its card. **Double-tap** to zoom to it.
+- **Zoom** with the scroll wheel or a pinch: it zooms toward the point under the cursor or between your fingers.
+- **Turn** by dragging (one finger on touch): the body turns around the point you grab. Drag empty space to turn around the last point you zoomed into.
+- **Move** with right-drag, or two fingers on touch.
 - **Search** (top bar, or ⌘K / Ctrl+K / `/`) across 3,169 structures.
 - **X-ray** fades everything except the selection. **Section** cuts the body axially, sagittally or coronally.
 - **Isolate** shows only the selected structure; **Show all** brings everything back.

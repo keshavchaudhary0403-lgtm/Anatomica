@@ -165,6 +165,7 @@ export default function App() {
   const selected = useStore((s) => s.selected);
   useEffect(() => { ready.then(setList); }, []);
   const done = list.length > 0 && skeletonLoading === false;
+  const touch = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
 
   return (
     <div className={`app${selected ? ' has-card' : ''}`}>
@@ -182,7 +183,7 @@ export default function App() {
       <FilterBar />
       <SectionPanel />
       <Dock />
-      {!selected && done && <p className="hint">Tap any structure. Double-tap to zoom in.</p>}
+      {!selected && done && <p className="hint">{touch ? 'Pinch to zoom where your fingers are. Drag with two fingers to move.' : 'Scroll to zoom where you point. Right-drag to move. Double-click to focus.'}</p>}
       <Hover />
       <Search list={list} />
       <Splash done={done} />

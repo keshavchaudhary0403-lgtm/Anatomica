@@ -4,6 +4,7 @@ Clinical 3D anatomy for an MBBS intern: the whole body in layers, with clinical 
 
 ## Use it
 
+- **Male / Female** switch above the layers swaps in the female pelvis (bones, uterus and tubes, ovaries, vulva, bladder, rectum).
 - **Layers** (left, or the strip under the top bar on a phone): tap to show or hide; hold to show only that layer.
 - **Tap** a structure to open its card. **Double-tap** to zoom to it.
 - **Turn**: drag (one finger on touch). The body turns around the point you grab.
@@ -43,8 +44,11 @@ cd tools && npm install
 node build-models.mjs raw ../public
 node build-descriptions.mjs <Z-Anatomy>/Resources/Descriptions/OriginalDescriptions
 node build-icons.mjs
+node build-female.mjs <path to Sketchfab download>/scene.gltf   # female pelvis
 ```
 
 ## Credits
 
 3D models and descriptions from [Z-Anatomy](https://github.com/LluisV/Z-Anatomy) (Gauthier Kervyn, Lluís Vinent), based on [BodyParts3D](https://dbarchive.biosciencedbc.jp/en/bodyparts3d/desc.html) by the Database Center for Life Science. Licensed [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/); overview texts come from Wikipedia under CC BY-SA. Derived models in this repository are shared under the same license.
+
+Female pelvis: "[Bony Pelvis and Pelvic Organs from MRI](https://sketchfab.com/3d-models/bony-pelvis-and-pelvic-organs-from-mri-ad38f2971a054b4db2cd05e3efce9c59)" by [audreybyrd](https://sketchfab.com/audreybyrd), licensed [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/); converted, scaled and positioned to fit the male skeleton.

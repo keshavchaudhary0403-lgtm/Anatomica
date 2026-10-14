@@ -9,6 +9,7 @@ import { ready } from './index-cache';
 import { Search } from './Search';
 import { saveViews, useStore, type Axis } from './store';
 import { useTheme } from './theme';
+import { setSex } from './procedure';
 import { nameOf } from './index-cache';
 import { Viewer, viewApi } from './Viewer';
 
@@ -27,12 +28,26 @@ function Splash({ done }: { done: boolean }) {
   );
 }
 
+function SexSwitch() {
+  const sex = useStore((s) => s.sex);
+  return (
+    <div className="sex" role="radiogroup" aria-label="Body">
+      {(['male', 'female'] as const).map((x) => (
+        <button key={x} role="radio" aria-checked={sex === x} className={sex === x ? 'on' : ''} onClick={() => setSex(x)}>
+          {x === 'male' ? 'Male' : 'Female'}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function Layers() {
   const visible = useStore((s) => s.visible);
   const loading = useStore((s) => s.loading);
   const press = useRef(0);
   return (
     <nav className="layers" aria-label="Body layers">
+      <SexSwitch />
       {SYSTEMS.map((sys) => (
         <button
           key={sys.id}
@@ -103,7 +118,7 @@ function Views() {
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name this view" />
             <button type="submit" disabled={!name.trim()}>Save</button>
           </form>
-          <p className="credits">3D models from <a href="https://github.com/LluisV/Z-Anatomy" target="_blank" rel="noreferrer">Z-Anatomy</a>, based on BodyParts3D (DBCLS). Licensed CC BY-SA 4.0.</p>
+          <p className="credits">3D models from <a href="https://github.com/LluisV/Z-Anatomy" target="_blank" rel="noreferrer">Z-Anatomy</a>, based on BodyParts3D (DBCLS), CC BY-SA 4.0. Female pelvis: "<a href="https://sketchfab.com/3d-models/bony-pelvis-and-pelvic-organs-from-mri-ad38f2971a054b4db2cd05e3efce9c59" target="_blank" rel="noreferrer">Bony Pelvis and Pelvic Organs from MRI</a>" by audreybyrd, CC BY 4.0.</p>
         </div>
       )}
     </div>

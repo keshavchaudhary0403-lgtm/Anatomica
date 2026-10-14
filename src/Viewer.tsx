@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { acceleratedRaycast, computeBoundsTree } from 'three-mesh-bvh';
 import type { OrbitControls as OrbitImpl } from 'three-stdlib';
-import { colorKey, SYSTEMS, TISSUE, type SystemId } from './data';
+import { colorKey, MALE_ONLY, SYSTEMS, TISSUE, type ModelId, type SystemId } from './data';
 import { useStore } from './store';
 import { byId, nameOf } from './index-cache';
 
@@ -38,7 +38,7 @@ function mat(kind: 'base' | 'glow' | 'ghost', tissue: string) {
 
 // ---------- registry of loaded meshes ----------
 interface Part { mesh: THREE.Mesh; id: string; tissue: string; sys: SystemId }
-const parts = new Map<SystemId, Part[]>();
+const parts = new Map<ModelId, Part[]>();
 const allParts = () => [...parts.values()].flat();
 if (import.meta.env.DEV) Object.assign(window, { __parts: parts });
 const bodyBox = new THREE.Box3(new THREE.Vector3(-0.34, 0, -0.15), new THREE.Vector3(0.34, 1.75, 0.15));
@@ -71,7 +71,7 @@ function applyState() {
   const s = useStore.getState();
   overlays.splice(0).forEach((o) => o.removeFromParent());
   for (const p of allParts()) {
-    const sysOn = s.visible[p.sys];
+    const sysOn = s.visible[p.sys] && !(s.sex === 'female' && MALE_ONLY.has(p.id));
     const role = s.proc?.roles.get(p.id);
     const inProc = !s.proc || role || s.proc.context.has(p.sys);
     const quizHit = s.quiz?.highlight === p.id;
@@ -101,7 +101,7 @@ function applyState() {
   }
 }
 
-function SystemModel({ id }: { id: SystemId }) {
+function SystemModel({ id }: { id: ModelId }) {
   const gltf = useGLTF(`/models/${id}.glb`, false, true);
   const invalidate = useThree((t) => t.invalidate);
   const scene = useMemo(() => {
@@ -122,7 +122,7 @@ function SystemModel({ id }: { id: SystemId }) {
         }
         const tissue = m.userData.t as string;
         m.userData.sid = sid;
-        list.push({ mesh: m, id: sid, tissue, sys: id });
+        list.push({ mesh: m, id: sid, tissue, sys: id === 'female' ? (byId.get(sid)?.layer ?? 'organs') : id });
       });
     });
     return { root: gltf.scene, list };
@@ -132,7 +132,7 @@ function SystemModel({ id }: { id: SystemId }) {
     parts.set(id, scene.list);
     applyState(); invalidate();
     useStore.setState((st) => ({ partsV: st.partsV + 1 }));
-    useStore.getState().setLoading(id, false);
+    if (id !== 'female') useStore.getState().setLoading(id, false);
     return () => { parts.delete(id); };
   }, [scene, id, invalidate]);
   return <primitive object={scene.root} />;
@@ -147,7 +147,7 @@ function Loader({ id }: { id: SystemId }) {
 function StateSync() {
   const invalidate = useThree((t) => t.invalidate);
   useEffect(() => useStore.subscribe((s, p) => {
-    if (s.visible !== p.visible || s.selected !== p.selected || s.hidden !== p.hidden || s.isolated !== p.isolated || s.xray !== p.xray || s.section !== p.section || s.proc !== p.proc || s.quiz !== p.quiz) {
+    if (s.visible !== p.visible || s.sex !== p.sex || s.selected !== p.selected || s.hidden !== p.hidden || s.isolated !== p.isolated || s.xray !== p.xray || s.section !== p.section || s.proc !== p.proc || s.quiz !== p.quiz) {
       applyState(); invalidate();
     }
   }), [invalidate]);
@@ -412,7 +412,7 @@ function CameraRig() {
     p.forEach((q) => box.expandByObject(q.mesh));
     const sphere = box.getBoundingSphere(new THREE.Sphere());
     const dir = st.focusDir ? new THREE.Vector3(...st.focusDir).normalize() : camera.position.clone().sub(controls.target).normalize();
-    const dist = THREE.MathUtils.clamp(sphere.radius * (st.focusList ? 3.6 : 4.8), 0.25, 3.2);
+    const dist = THREE.MathUtils.clamp(sphere.radius * (st.focusList ? 3.6 : 4.8), st.focusList ? 0.5 : 0.25, 3.2);
     fly(sphere.center.clone(), sphere.center.clone().add(dir.multiplyScalar(dist)));
   }, [focusReq, partsV, controls]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (resetReq) fly(HOME.target.clone(), HOME.cam.clone()); }, [resetReq]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -498,6 +498,7 @@ function Spin() {
 export function Viewer() {
   const visible = useStore((s) => s.visible);
   const spin = useStore((s) => s.spin);
+  const sex = useStore((s) => s.sex);
   return (
     <Canvas
       className="viewer"
@@ -514,6 +515,7 @@ export function Viewer() {
       {SYSTEMS.map(({ id }) => (visible[id] ? (
         <Suspense key={id} fallback={<Loader id={id} />}><SystemModel id={id} /></Suspense>
       ) : null))}
+      {sex === 'female' && <Suspense fallback={null}><SystemModel id="female" /></Suspense>}
       <LandmarkPin />
       <OrbitControls makeDefault target={HOME.target} enableDamping={false} enableZoom={false} enableRotate={false} enablePan={false} minDistance={0.03} maxDistance={7.5} autoRotate={spin} autoRotateSpeed={0.9} />
       <Navigation />

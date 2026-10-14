@@ -1,6 +1,7 @@
 import { PROCEDURES, type Procedure, type Ref, type Role } from './content/procedures';
 import type { SystemId } from './data';
-import { resolve } from './index-cache';
+import { layerOf, resolve } from './index-cache';
+import { MALE_ONLY, type Sex } from './data';
 import { useStore } from './store';
 
 // Patient faces +z; the patient's right side is -x.
@@ -13,7 +14,7 @@ const DIRS: Record<Procedure['view'], [number, number, number]> = {
   'back-right': [-0.7, 0.2, -0.7],
 };
 
-export const idOf = (r: Ref) => resolve(r.n, r.s)?.id ?? null;
+export const idOf = (r: Ref) => resolve(r.n, r.s, useStore.getState().sex)?.id ?? null;
 
 function frame(ids: string[], view: Procedure['view']) {
   const st = useStore.getState();
@@ -23,6 +24,7 @@ function frame(ids: string[], view: Procedure['view']) {
 export function startProcedure(id: string) {
   const p = PROCEDURES.find((x) => x.id === id);
   if (!p) return;
+  if (p.sex && useStore.getState().sex !== p.sex) setSex(p.sex);
   const st = useStore.getState();
   const roles = new Map<string, Role>();
   const faint = new Set<string>();
@@ -32,7 +34,7 @@ export function startProcedure(id: string) {
     if (!sid) continue;
     roles.set(sid, role);
     if (f) faint.add(sid);
-    systems.add(sid.split('/')[0] as SystemId);
+    systems.add(layerOf(sid));
   }
   const before = st.proc?.before ?? st.visible;
   const visible = Object.fromEntries(Object.keys(st.visible).map((k) => [k, systems.has(k as SystemId)])) as typeof st.visible;
@@ -72,3 +74,11 @@ export function endProcedure() {
 }
 
 export { PROCEDURES };
+
+export function setSex(sex: Sex) {
+  const st = useStore.getState();
+  try { localStorage.setItem('anatomica.sex', sex); } catch { /* storage unavailable */ }
+  const sel = st.selected;
+  const gone = sel && (sex === 'female' ? MALE_ONLY.has(sel) : sel.startsWith('female/'));
+  st.set({ sex, selected: gone ? null : sel, isolated: null });
+}

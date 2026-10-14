@@ -1,12 +1,16 @@
 export type SystemId = 'skin' | 'skeleton' | 'joints' | 'muscles' | 'vessels' | 'nerves' | 'organs' | 'lymph';
 
 export interface Landmark { n: string; p: [number, number, number] }
+export type ModelId = SystemId | 'female';
+export type Sex = 'male' | 'female';
 export interface Structure {
   id: string;
   name: string;
+  /** For the female model: the layer toggle this structure follows. */
+  layer?: SystemId;
   dkey: string; // lookup key for descriptions (the model's original name, lower case)
   side: 'left' | 'right' | null;
-  sys: SystemId;
+  sys: ModelId;
   tissue: string;
   path: string[];
   lm: Landmark[];
@@ -44,6 +48,11 @@ export const TISSUE: Record<string, { color: string; rough: number; label: strin
   gland: { color: '#d9b06a', rough: 0.55, label: 'Gland' },
   lymph: { color: '#8fc96f', rough: 0.5, label: 'Lymphoid' },
   skin: { color: '#d9a98c', rough: 0.7, label: 'Skin' },
+  uterus: { color: '#c96a78', rough: 0.5, label: 'Organ' },
+  ovary: { color: '#e3b4a0', rough: 0.55, label: 'Organ' },
+  vulva: { color: '#d48c8c', rough: 0.55, label: 'Organ' },
+  bladder: { color: '#d9b39a', rough: 0.5, label: 'Organ' },
+  'large-bowel': { color: '#c99070', rough: 0.55, label: 'Gut' },
   nail: { color: '#f1ddd0', rough: 0.3, label: 'Nail' },
 };
 
@@ -70,11 +79,32 @@ export function colorKey(s: Structure) {
   return s.tissue;
 }
 
+const DESC_KEY: Record<string, string> = { 'Uterus and uterine tubes': 'Uterus', 'Hip bone (female pelvis)': 'Hip bone', 'Lumbar intervertebral discs (female)': 'Intervertebral disc', 'Pelvic joint cartilage (female)': 'Pubic symphysis' };
+
+/** Structures replaced by the female pelvis when the female body is shown. */
+export const MALE_ONLY = new Set([
+  'skin/Urogenital region.r', 'skin/Urogenital region.l',
+  'skeleton/Coccyx', 'skeleton/Sacrum', 'skeleton/Vertebra L3', 'skeleton/Vertebra L4', 'skeleton/Vertebra L5', 'skeleton/Hip bone.r', 'skeleton/Hip bone.l',
+  'joints/Intervertebral disc L3-L4', 'joints/Intervertebral disc L4-L5', 'joints/Intervertebral disc L5-S1',
+  'joints/Nucleus pulposus L3-L4', 'joints/Nucleus pulposus L4-L5', 'joints/Nucleus pulposus L5-S1',
+  'vessels/Dorsal artery of penis.r', 'vessels/Dorsal artery of penis.l', 'vessels/Deep artery of penis.r', 'vessels/Deep artery of penis.l',
+  'vessels/Deep dorsal vein of penis', 'vessels/Superficial dorsal veins of penis',
+  'organs/Urinary bladder', 'organs/Urethra', 'organs/Testis.r', 'organs/Testis.l', 'organs/Epididymis.r', 'organs/Epididymis.l',
+  'organs/Ductus deferens.r', 'organs/Ductus deferens.l', 'organs/Seminal gland.r', 'organs/Seminal gland.l', 'organs/Prostate',
+  'organs/Ejaculatory duct.r', 'organs/Ejaculatory duct.l', 'organs/Glans penis', 'organs/Corpus cavernosum of penis', 'organs/Corpus spongiosum of penis',
+]);
+/** In the female body, these names point to the female model's structure. */
+export const FEMALE_SWAP: Record<string, string> = {
+  'Hip bone': 'Hip bone (female pelvis)', Sacrum: 'Sacrum (female)', 'Urinary bladder': 'Urinary bladder (female)',
+  'Vertebra L3': 'Vertebra L3 (female)', 'Vertebra L4': 'Vertebra L4 (female)', 'Vertebra L5': 'Vertebra L5 (female)',
+};
+export const showsIn = (s: { id: string; sys: ModelId }, sex: Sex) => (sex === 'female' ? !MALE_ONLY.has(s.id) : s.sys !== 'female');
+
 let cache: Promise<Structure[]> | null = null;
 export function loadStructures() {
   cache ??= fetch('/data/structures.json').then((r) => r.json()).then((list: Structure[]) => {
     for (const s of list) {
-      s.dkey = s.name.toLowerCase();
+      s.dkey = (DESC_KEY[s.name] ?? s.name.replace(/ \(female( pelvis)?\)$/, '')).toLowerCase();
       // The source drops a closing bracket: "Facial nerve (VII" -> "Facial nerve (VII)".
       if ((s.name.match(/\(/g) || []).length > (s.name.match(/\)/g) || []).length) s.name += ')';
     }

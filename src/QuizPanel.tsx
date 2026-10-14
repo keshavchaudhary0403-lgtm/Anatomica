@@ -2,16 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { clinicalFor, REGIONS, type Region } from './content';
 import { resolve } from './index-cache';
 import * as Icon from './icons';
-import { choicesFor, grade, itemsReady, progress, resetProgress, session, type Item, type Mode } from './quiz';
+import { choicesFor, grade, itemsReady, progress, resetProgress, session, setQuizSex, type Item, type Mode } from './quiz';
 import { useStore } from './store';
-import type { SystemId } from './data';
+import { layerOf } from './index-cache';
 
 const MODES: [Mode, string][] = [['mixed', 'Mixed'], ['identify', 'Identify on model'], ['mcq', 'MCQs']];
 
 function show(structureId: string | null) {
   const st = useStore.getState();
   if (!structureId) { st.set({ quiz: { highlight: null } }); return; }
-  const sys = structureId.split('/')[0] as SystemId;
+  const sys = layerOf(structureId);
   st.set({
     quiz: { highlight: structureId }, selected: null, isolated: null,
     visible: { ...st.visible, [sys]: true },
@@ -21,6 +21,8 @@ function show(structureId: string | null) {
 
 export function QuizPanel() {
   const quiz = useStore((s) => s.quiz);
+  const sex = useStore((s) => s.sex);
+  setQuizSex(sex);
   const [ready, setReady] = useState(false);
   const [region, setRegion] = useState<Region | 'All'>('All');
   const [mode, setMode] = useState<Mode>('mixed');
@@ -50,7 +52,7 @@ export function QuizPanel() {
     const ok = k === answer;
     if (ok) setScore((v) => v + 1);
     grade(item.id, ok);
-    if (item.kind === 'mcq') { const r = resolve(item.q.ref, 'right'); if (r) show(r.id); }
+    if (item.kind === 'mcq') { const r = resolve(item.q.ref, 'right', sex); if (r) show(r.id); }
   };
   const next = () => { setPicked(null); setI((v) => v + 1); };
 

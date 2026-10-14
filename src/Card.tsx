@@ -23,7 +23,7 @@ export function Card() {
   if (!s) return null;
 
   const d = desc[s.dkey];
-  const sys = SYSTEMS.find((x) => x.id === s.sys)!;
+  const sys = SYSTEMS.find((x) => x.id === (s.layer ?? s.sys))!;
   const st = useStore.getState();
   const isolatedHere = !!isolated?.has(s.id);
   const tabs: [Tab, string, boolean][] = [

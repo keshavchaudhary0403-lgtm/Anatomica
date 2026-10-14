@@ -1,11 +1,13 @@
 import Fuse from 'fuse.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { hasClinical } from './content';
-import { SYSTEMS, TISSUE, type Structure } from './data';
+import { showsIn, SYSTEMS, TISSUE, type Structure } from './data';
 import { useStore } from './store';
 
-export function Search({ list }: { list: Structure[] }) {
+export function Search({ list: all }: { list: Structure[] }) {
   const open = useStore((s) => s.searchOpen);
+  const sex = useStore((s) => s.sex);
+  const list = useMemo(() => all.filter((s) => showsIn(s, sex)), [all, sex]);
   const [q, setQ] = useState('');
   const [i, setI] = useState(0);
   const input = useRef<HTMLInputElement>(null);
@@ -53,7 +55,7 @@ export function Search({ list }: { list: Structure[] }) {
                 <span className="dot" style={{ background: TISSUE[s.tissue]?.color }} />
                 <span className="r-name">{s.name}{s.side ? <em> {s.side}</em> : null}</span>
                 {hasClinical(s.name) && <span className="tag">Notes</span>}
-                <span className="r-sys">{SYSTEMS.find((x) => x.id === s.sys)?.label}</span>
+                <span className="r-sys">{SYSTEMS.find((x) => x.id === (s.layer ?? s.sys))?.label}</span>
               </button>
             </li>
           ))}

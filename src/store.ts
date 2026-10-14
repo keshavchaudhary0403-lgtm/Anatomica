@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import type { Landmark, SystemId } from './data';
+import type { Landmark, Sex, SystemId } from './data';
+import { layerOf } from './index-cache';
 import type { Role } from './content/procedures';
 
 export type Axis = 'y' | 'x' | 'z';
@@ -15,6 +16,7 @@ interface State {
   isolated: Set<string> | null;
   xray: boolean;
   spin: boolean;
+  sex: Sex;
   section: { on: boolean; axis: Axis; pos: number; flip: boolean };
   landmark: Landmark | null;
   focusReq: number; // bump to fly camera to selection
@@ -53,6 +55,7 @@ export const useStore = create<State>((set, get) => ({
   isolated: null,
   xray: false,
   spin: false,
+  sex: (() => { try { return localStorage.getItem('anatomica.sex') === 'female' ? 'female' : 'male'; } catch { return 'male'; } })() as Sex,
   section: { on: false, axis: 'y', pos: 0.5, flip: false },
   landmark: null,
   focusReq: 0,
@@ -69,7 +72,7 @@ export const useStore = create<State>((set, get) => ({
   setLoading: (id, v) => set((s) => ({ loading: { ...s.loading, [id]: v } })),
   select: (id, fly = false) => {
     if (id) {
-      const sys = id.split('/')[0] as SystemId;
+      const sys = layerOf(id);
       const hidden = new Set(get().hidden); hidden.delete(id);
       set((s) => ({ selected: id, landmark: null, hidden, visible: { ...s.visible, [sys]: true }, focusList: fly ? null : s.focusList, focusDir: fly ? null : s.focusDir, focusReq: fly ? s.focusReq + 1 : s.focusReq }));
     } else set({ selected: null, landmark: null });

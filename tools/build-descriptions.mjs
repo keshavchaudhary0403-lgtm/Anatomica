@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const dir = process.argv[2];
-const names = new Set(JSON.parse(fs.readFileSync(new URL('../public/data/structures.json', import.meta.url))).map((s) => s.name.toLowerCase()));
+const EXTRA = ['uterus', 'ovary', 'vulva', 'rectum', 'hip bone', 'intervertebral disc', 'pubic symphysis'];
+const names = new Set([...JSON.parse(fs.readFileSync(new URL('../public/data/structures.json', import.meta.url))).map((s) => s.name.toLowerCase().replace(/ \(female( pelvis)?\)$/, '')), ...EXTRA]);
 const out = {};
 for (const f of fs.readdirSync(dir)) {
   if (!f.endsWith('.txt')) continue;

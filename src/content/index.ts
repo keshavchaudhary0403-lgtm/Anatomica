@@ -61,6 +61,8 @@ function baseOf(name: string) {
 
 export function keyFor(name: string): string | null {
   if (ALL[name]) return name;
+  const f = name.replace(/ \(female( pelvis)?\)$/, '');
+  if (f !== name && ALL[f]) return f;
   if (ALIAS[name] && ALL[ALIAS[name]]) return ALIAS[name];
   const b = baseOf(name);
   if (b && ALL[b]) return b;

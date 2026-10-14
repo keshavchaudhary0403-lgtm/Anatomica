@@ -11,6 +11,8 @@ export interface Procedure {
   context: SystemId[];
   /** Which way the camera looks from: the side of the patient you stand on. */
   view: 'front' | 'back' | 'right' | 'left' | 'front-right' | 'back-right';
+  /** Switches the body to this sex when the procedure starts. */
+  sex?: 'male' | 'female';
   /** faint: drawn as a light tint (for large sheets like the pleura). */
   roles: { ref: Ref; role: Role; faint?: boolean }[];
   steps: { title: string; text: string; focus?: Ref }[];
@@ -157,6 +159,7 @@ export const PROCEDURES: Procedure[] = [
     id: 'foley',
     title: 'Foley catheterisation (male)',
     summary: 'Lift the penis to straighten the urethra; balloon only after urine flows.',
+    sex: 'male',
     context: ['skeleton'],
     view: 'front-right',
     roles: [
@@ -176,6 +179,26 @@ export const PROCEDURES: Procedure[] = [
       'Catheterising after pelvic trauma with blood at the meatus: get a retrograde urethrogram first.',
       'Forgetting to replace the foreskin.',
     ],
+  },
+  {
+    id: 'foley-female',
+    title: 'Foley catheterisation (female)',
+    summary: 'Separate the labia; the meatus lies just above the vaginal opening.',
+    sex: 'female',
+    context: ['skeleton'],
+    view: 'front',
+    roles: [
+      { ref: N('Urinary bladder (female)'), role: 'target' },
+      { ref: N('Vulva'), role: 'landmark' },
+      { ref: N('Uterus and uterine tubes'), role: 'landmark' },
+    ],
+    steps: [
+      { title: 'Position and prepare', text: 'Supine, knees bent and apart (frog-leg). Aseptic technique; clean from front to back.', focus: N('Vulva') },
+      { title: 'Find the meatus', text: 'Separate the labia minora with the non-dominant hand. The external urethral meatus lies between the clitoris and the vaginal opening.', focus: N('Vulva') },
+      { title: 'Insert', text: 'The female urethra is about 4 cm long. Advance 5–7 cm, or until urine flows, then a little further.', focus: N('Urinary bladder (female)') },
+      { title: 'Inflate', text: 'Inflate the balloon only after urine drains. If the catheter enters the vagina, leave it there as a marker and use a fresh catheter.' },
+    ],
+    mistakes: ['Passing the catheter into the vagina, then reusing the same contaminated catheter.', 'Inflating the balloon before urine flows.'],
   },
   {
     id: 'ijv-line',

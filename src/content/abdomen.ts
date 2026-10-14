@@ -138,4 +138,50 @@ export const ABDOMEN: Record<string, Clinical> = {
     neet: ['Median lobe enlargement causes the most urinary obstruction.'],
     procedure: 'Foley catheterisation',
   },
+  'Uterus and uterine tubes': {
+    supply: [
+      { label: 'Artery', text: 'Uterine artery (internal iliac), anastomosing with the ovarian artery' },
+      { label: 'Support', text: 'Pelvic floor (levator ani), transverse cervical (cardinal) and uterosacral ligaments' },
+    ],
+    clinical: [
+      'Normally anteverted and anteflexed; a retroverted uterus is a common normal variant.',
+      'The uterine artery crosses above the ureter near the cervix: the ureter is at risk in hysterectomy.',
+      'Ectopic pregnancy is most common in the ampulla of the uterine tube; rupture causes haemoperitoneum.',
+      'Uterine prolapse follows weakness of the cardinal and uterosacral ligaments and the pelvic floor.',
+    ],
+    neet: [
+      'Parts of the uterine tube, lateral to medial: infundibulum (fimbriae), ampulla (fertilisation), isthmus, intramural part.',
+      'Lymph from the fundus drains to para-aortic nodes; from the body to external iliac nodes; from around the uterine tube attachment to superficial inguinal nodes (round ligament).',
+    ],
+    imaging: 'Transvaginal ultrasound for endometrial thickness, fibroids and early pregnancy.',
+  },
+  Ovary: {
+    supply: [{ label: 'Artery', text: 'Ovarian artery from the abdominal aorta at L2' }, { label: 'Vein', text: 'Right ovarian vein to the IVC; left to the left renal vein' }],
+    clinical: [
+      'Ovarian pain is referred to the medial thigh through the obturator nerve, which lies on the lateral pelvic wall next to the ovary.',
+      'Ovarian torsion: sudden severe unilateral pain; a surgical emergency.',
+      'Ovarian cancer often presents late with bloating and ascites; spreads across the peritoneum.',
+    ],
+    neet: ['Lies in the ovarian fossa, bounded by the external iliac vessels, ureter and internal iliac vessels.', 'Suspensory ligament of the ovary carries the ovarian vessels.'],
+    imaging: 'Pelvic ultrasound; Doppler for torsion (absent flow is not always seen).',
+  },
+  Vulva: {
+    supply: [{ label: 'Nerve', text: 'Pudendal nerve (S2–S4); anterior part by the ilio-inguinal and genitofemoral nerves' }],
+    clinical: [
+      'Bartholin gland abscess: painful swelling at the posterior part of the labium majus.',
+      'Pudendal nerve block (at the ischial spine) is used for instrumental delivery.',
+      'Episiotomy is usually mediolateral to avoid extending into the anal sphincter.',
+    ],
+    neet: ['External urethral meatus lies between the clitoris and the vaginal orifice.', 'Lymph drains to the superficial inguinal nodes.'],
+    procedure: 'Foley catheterisation (female)',
+  },
+  Rectum: {
+    supply: [{ label: 'Arteries', text: 'Superior rectal (inferior mesenteric), middle rectal (internal iliac), inferior rectal (internal pudendal)' }],
+    clinical: [
+      'Digital rectal examination feels the cervix in women and the prostate in men.',
+      'Rectouterine pouch (of Douglas) is the lowest part of the female peritoneal cavity; fluid, pus or blood collects there.',
+      'Internal haemorrhoids lie at 3, 7 and 11 o\'clock in the lithotomy position.',
+    ],
+    neet: ['Begins at S3; has no taeniae coli, appendices epiploicae or haustra.'],
+  },
 };

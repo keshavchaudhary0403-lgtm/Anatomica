@@ -3,3 +3,4 @@ dist
 tools/node_modules
 tools/raw
 .DS_Store
+*.tsbuildinfo

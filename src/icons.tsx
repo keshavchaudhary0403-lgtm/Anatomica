@@ -14,4 +14,7 @@ export const Close = () => <I d={<path d="M6 6l12 12M18 6 6 18" />} />;
 export const Layers = () => <I d={<><path d="m12 3.5 9 5-9 5-9-5Z" /><path d="m3 13 9 5 9-5" /></>} />;
 export const Flip = () => <I d={<><path d="M7 4v16M17 4v16" /><path d="m4 8 3-4 3 4M14 16l3 4 3-4" /></>} />;
 export const Expand = () => <I d={<path d="M8 4H4v4M16 4h4v4M8 20H4v-4M16 20h4v-4" />} />;
+export const Sun = () => <I d={<><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4" /></>} />;
+export const Moon = () => <I d={<path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10Z" />} />;
+export const Undo = () => <I d={<><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></>} />;
 export const Rotate = () => <I d={<><ellipse cx="12" cy="12" rx="9" ry="3.6" /><path d="M12 3v18" strokeDasharray="2 2.5" /></>} />;

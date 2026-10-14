@@ -87,10 +87,15 @@ function SystemModel({ id }: { id: SystemId }) {
       o.traverse((c) => {
         if (!(c as THREE.Mesh).isMesh) return;
         const m = c as THREE.Mesh;
-        let tissue = (Array.isArray(m.material) ? m.material[0] : m.material).name || 'organ';
-        const info = byId.get(sid);
-        if (info && tissue === info.tissue) tissue = colorKey(info);
-        m.userData.t = tissue;
+        // Read the tissue from the file's material only once: after that the mesh carries
+        // our shared materials, and re-reading them (when a layer is shown again) loses it.
+        if (m.userData.t === undefined) {
+          let t = (Array.isArray(m.material) ? m.material[0] : m.material).name || 'organ';
+          const info = byId.get(sid);
+          if (info && t === info.tissue) t = colorKey(info);
+          m.userData.t = t;
+        }
+        const tissue = m.userData.t as string;
         m.userData.sid = sid;
         list.push({ mesh: m, id: sid, tissue, sys: id });
       });

@@ -10,6 +10,7 @@ interface State {
   selected: string | null;
   hovered: { name: string; x: number; y: number } | null;
   hidden: Set<string>;
+  hideLog: string[]; // order of hides, for undo
   isolated: Set<string> | null;
   xray: boolean;
   spin: boolean;
@@ -26,6 +27,8 @@ interface State {
   select: (id: string | null, fly?: boolean) => void;
   hide: (id: string) => void;
   isolate: (id: string) => void;
+  unisolate: () => void;
+  undoHide: () => void;
   showAll: () => void;
   set: (p: Partial<State>) => void;
 }
@@ -41,6 +44,7 @@ export const useStore = create<State>((set, get) => ({
   selected: null,
   hovered: null,
   hidden: new Set(),
+  hideLog: [],
   isolated: null,
   xray: false,
   spin: false,
@@ -61,8 +65,15 @@ export const useStore = create<State>((set, get) => ({
       set((s) => ({ selected: id, landmark: null, hidden, visible: { ...s.visible, [sys]: true }, focusReq: fly ? s.focusReq + 1 : s.focusReq }));
     } else set({ selected: null, landmark: null });
   },
-  hide: (id) => set((s) => { const h = new Set(s.hidden); h.add(id); return { hidden: h, selected: s.selected === id ? null : s.selected }; }),
+  hide: (id) => set((s) => { const h = new Set(s.hidden); h.add(id); return { hidden: h, hideLog: [...s.hideLog, id], selected: s.selected === id ? null : s.selected, landmark: null }; }),
   isolate: (id) => set((s) => ({ isolated: new Set([id]), selected: id, focusReq: s.focusReq + 1 })),
-  showAll: () => set({ hidden: new Set(), isolated: null }),
+  unisolate: () => set({ isolated: null }),
+  undoHide: () => set((s) => {
+    const log = s.hideLog.slice(); const last = log.pop();
+    if (!last) return {};
+    const h = new Set(s.hidden); h.delete(last);
+    return { hidden: h, hideLog: log };
+  }),
+  showAll: () => set({ hidden: new Set(), hideLog: [], isolated: null }),
   set: (p) => set(p),
 }));

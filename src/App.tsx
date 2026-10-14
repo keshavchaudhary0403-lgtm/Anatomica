@@ -6,6 +6,8 @@ import * as Icon from './icons';
 import { ready } from './index-cache';
 import { Search } from './Search';
 import { saveViews, useStore, type Axis } from './store';
+import { useTheme } from './theme';
+import { nameOf } from './index-cache';
 import { Viewer, viewApi } from './Viewer';
 
 function Splash({ done }: { done: boolean }) {
@@ -123,6 +125,34 @@ function Dock() {
   );
 }
 
+// Always-visible way back when something is isolated or hidden.
+function FilterBar() {
+  const isolated = useStore((s) => s.isolated);
+  const hidden = useStore((s) => s.hidden);
+  const hideLog = useStore((s) => s.hideLog);
+  if (!isolated && hidden.size === 0) return null;
+  const st = useStore.getState();
+  const iso = isolated ? [...isolated][0] : null;
+  const last = hideLog.at(-1);
+  return (
+    <div className="filter-bar" role="status">
+      <span>{iso ? `Showing only ${nameOf(iso)}` : hidden.size === 1 && last ? `${nameOf(last)} hidden` : `${hidden.size} structures hidden`}</span>
+      {!iso && last && <button className="undo" onClick={() => st.undoHide()}>Undo</button>}
+      <button className="all" onClick={() => st.showAll()}>Show all</button>
+    </div>
+  );
+}
+
+function ThemeButton() {
+  const [theme, toggle] = useTheme();
+  const next = theme === 'dark' ? 'light' : 'dark';
+  return (
+    <button className="icon-btn" onClick={toggle} aria-label={`Switch to ${next} theme`} title={`Switch to ${next} theme`}>
+      {theme === 'dark' ? <Icon.Sun /> : <Icon.Moon />}
+    </button>
+  );
+}
+
 function Hover() {
   const h = useStore((s) => s.hovered);
   if (!h) return null;
@@ -145,10 +175,11 @@ export default function App() {
         <button className="search-pill" onClick={() => useStore.getState().set({ searchOpen: true })}>
           <Icon.Search /><span>Search structures</span><kbd>⌘K</kbd>
         </button>
-        <Views />
+        <div className="top-right"><ThemeButton /><Views /></div>
       </header>
       <Layers />
       <Card />
+      <FilterBar />
       <SectionPanel />
       <Dock />
       {!selected && done && <p className="hint">Tap any structure. Double-tap to zoom in.</p>}

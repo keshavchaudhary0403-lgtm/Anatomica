@@ -10,6 +10,7 @@ type Tab = 'clinical' | 'overview' | 'landmarks';
 export function Card() {
   const selected = useStore((s) => s.selected);
   const landmark = useStore((s) => s.landmark);
+  const isolated = useStore((s) => s.isolated);
   const [desc, setDesc] = useState<Record<string, { t: string; u: string }>>({});
   const [tab, setTab] = useState<Tab>('overview');
   const [tall, setTall] = useState(false);
@@ -23,6 +24,7 @@ export function Card() {
   const d = desc[s.name.toLowerCase()];
   const sys = SYSTEMS.find((x) => x.id === s.sys)!;
   const st = useStore.getState();
+  const isolatedHere = !!isolated?.has(s.id);
   const tabs: [Tab, string, boolean][] = [
     ['clinical', 'Clinical', !!clin],
     ['overview', 'Overview', true],
@@ -46,7 +48,9 @@ export function Card() {
 
       <div className="card-actions">
         <button className="chip-btn" onClick={() => st.set({ focusReq: st.focusReq + 1 })}><Icon.Target /> Focus</button>
-        <button className="chip-btn" onClick={() => st.isolate(s.id)}><Icon.Expand /> Isolate</button>
+        {isolatedHere
+          ? <button className="chip-btn on" onClick={() => st.unisolate()}><Icon.Expand /> Exit isolate</button>
+          : <button className="chip-btn" onClick={() => st.isolate(s.id)}><Icon.Expand /> Isolate</button>}
         <button className="chip-btn" onClick={() => st.hide(s.id)}><Icon.EyeOff /> Hide</button>
       </div>
 

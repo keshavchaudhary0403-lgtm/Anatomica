@@ -183,7 +183,7 @@ export default function App() {
       <FilterBar />
       <SectionPanel />
       <Dock />
-      {!selected && done && <p className="hint">{touch ? 'Pinch to zoom where your fingers are. Drag with two fingers to move.' : 'Scroll to zoom where you point. Right-drag to move. Double-click to focus.'}</p>}
+      {!selected && done && <p className="hint">{touch ? 'Drag to turn. Pinch to zoom, two fingers to move.' : 'Drag to turn. Scroll to zoom. Right-drag or two-finger swipe to move.'}</p>}
       <Hover />
       <Search list={list} />
       <Splash done={done} />

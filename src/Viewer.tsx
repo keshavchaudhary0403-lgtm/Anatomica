@@ -162,17 +162,29 @@ function Interaction() {
   useEffect(() => {
     const el = gl.domElement;
     let down: { x: number; y: number; t: number } | null = null;
+    let fingers = 0; let multi = false;
+    let lastTap: { x: number; y: number; t: number } | null = null;
     let hoverTimer = 0;
-    const onDown = (e: PointerEvent) => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; clearTimeout(hoverTimer); useStore.getState().set({ hovered: null }); };
+    const onDown = (e: PointerEvent) => {
+      fingers++; if (fingers > 1) multi = true;
+      if (!e.isPrimary) return;
+      down = { x: e.clientX, y: e.clientY, t: performance.now() }; clearTimeout(hoverTimer); useStore.getState().set({ hovered: null }); };
     const onUp = (e: PointerEvent) => {
-      if (!down) return;
+      fingers = Math.max(0, fingers - 1);
+      const wasMulti = multi; if (fingers === 0) multi = false;
+      if (!down || wasMulti || e.button !== 0) { if (fingers === 0) down = null; return; }
       const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
       const quick = performance.now() - down.t < 450;
       down = null;
       if (moved > 6 || !quick) return;
       const id = pick(e.clientX, e.clientY, el, camera);
-      useStore.getState().select(id);
+      // Touch screens do not reliably send dblclick, so detect a double tap here.
+      const now = performance.now();
+      const dbl = e.pointerType === 'touch' && lastTap && now - lastTap.t < 320 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30;
+      lastTap = dbl ? null : { x: e.clientX, y: e.clientY, t: now };
+      useStore.getState().select(id, !!(dbl && id));
     };
+    const onCancel = () => { fingers = Math.max(0, fingers - 1); if (fingers === 0) { multi = false; down = null; } };
     const onDbl = (e: MouseEvent) => {
       const id = pick(e.clientX, e.clientY, el, camera);
       if (id) useStore.getState().select(id, true);
@@ -189,125 +201,156 @@ function Interaction() {
     const onLeave = () => { clearTimeout(hoverTimer); useStore.getState().set({ hovered: null }); };
     el.addEventListener('pointerdown', onDown);
     el.addEventListener('pointerup', onUp);
+    el.addEventListener('pointercancel', onCancel);
     el.addEventListener('dblclick', onDbl);
     el.addEventListener('pointermove', onMove);
     el.addEventListener('pointerleave', onLeave);
     return () => {
       el.removeEventListener('pointerdown', onDown); el.removeEventListener('pointerup', onUp);
-      el.removeEventListener('dblclick', onDbl); el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointercancel', onCancel); el.removeEventListener('dblclick', onDbl); el.removeEventListener('pointermove', onMove);
       el.removeEventListener('pointerleave', onLeave);
     };
   }, [gl, camera]);
   return null;
 }
 
-// ---------- zoom toward the point under the cursor or fingers ----------
-// Camera and orbit target both move toward that point by the same factor, so the point
-// stays put on screen and becomes the new centre of rotation as you zoom in.
-function ZoomToPoint() {
+// ---------- navigation ----------
+// Every gesture moves camera and orbit target together, anchored on the point under the
+// cursor or fingers, so whatever you touch stays under your hand:
+//   drag (1 finger)         turn around the point you grabbed
+//   right-drag, shift-drag  move the body under the cursor (2 fingers on touch, 2-finger swipe on a trackpad)
+//   wheel, pinch            zoom toward the point under the cursor / between the fingers
+function Navigation() {
   const { gl, camera, invalidate } = useThree();
   const controls = useThree((t) => t.controls) as unknown as OrbitImpl | null;
   useEffect(() => {
     if (!controls) return;
     const el = gl.domElement;
+    const cam = camera as THREE.PerspectiveCamera;
     const MIN = 0.035, MAX = 7;
+    const up = new THREE.Vector3(0, 1, 0);
 
-    const anchor = (x: number, y: number) => {
-      const hit = pickHit(x, y, el, camera);
-      if (hit) return hit.point;
-      // Nothing under the pointer: use the point on that ray at the current target depth.
+    const ndc = (x: number, y: number) => {
       const r = el.getBoundingClientRect();
-      const ndc = new THREE.Vector2(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1);
-      raycaster.setFromCamera(ndc, camera);
-      const depth = camera.position.distanceTo(controls.target);
-      return raycaster.ray.at(depth, new THREE.Vector3());
+      return new THREE.Vector2(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1);
     };
+    // The 3D point under a screen point: the structure there, or else a point at the orbit target's depth.
+    const pointAt = (x: number, y: number) => {
+      const hit = pickHit(x, y, el, camera);
+      if (hit) return { p: hit.point, hit: true };
+      raycaster.setFromCamera(ndc(x, y), camera);
+      const fwd = controls.target.clone().sub(camera.position).normalize();
+      const depth = Math.max(0.05, controls.target.clone().sub(camera.position).dot(fwd));
+      const t = depth / Math.max(0.2, raycaster.ray.direction.dot(fwd));
+      return { p: raycaster.ray.at(t, new THREE.Vector3()), hit: false };
+    };
+    const changed = () => { controls.update(); invalidate(); };
+    const stopSpin = () => { if (useStore.getState().spin) useStore.getState().set({ spin: false }); };
+
     const zoom = (p: THREE.Vector3, scale: number) => {
       const dist = camera.position.distanceTo(controls.target);
       const s = THREE.MathUtils.clamp(scale, MIN / dist, MAX / dist);
       camera.position.sub(p).multiplyScalar(s).add(p);
       controls.target.sub(p).multiplyScalar(s).add(p);
-      controls.update(); invalidate();
+      changed();
     };
-
-    // Last point zoomed into on a structure: the turning centre when a drag starts on empty space.
-    let lastAnchor: THREE.Vector3 | null = null;
-    let wheelAnchor: THREE.Vector3 | null = null; let wheelTimer = 0;
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      if (!wheelAnchor) {
-        const hit = pickHit(e.clientX, e.clientY, el, camera);
-        wheelAnchor = hit ? hit.point : anchor(e.clientX, e.clientY);
-        if (hit) lastAnchor = hit.point;
-      }
-      clearTimeout(wheelTimer); wheelTimer = window.setTimeout(() => { wheelAnchor = null; }, 260);
-      const d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
-      zoom(wheelAnchor, Math.exp(THREE.MathUtils.clamp(d, -120, 120) * 0.0016));
+    // Slide camera and target so the point at depth `depthPoint` follows the pointer exactly.
+    const pan = (dx: number, dy: number, depthPoint: THREE.Vector3) => {
+      const fwd = new THREE.Vector3(); camera.getWorldDirection(fwd);
+      const depth = Math.max(0.03, depthPoint.clone().sub(camera.position).dot(fwd));
+      const perPx = (2 * depth * Math.tan(THREE.MathUtils.degToRad(cam.fov / 2))) / el.clientHeight;
+      const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+      const camUp = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
+      const move = right.multiplyScalar(-dx * perPx).add(camUp.multiplyScalar(dy * perPx));
+      camera.position.add(move); controls.target.add(move);
+      changed();
     };
-
-    // ---- turning: orbit camera and target together around the point you grab ----
-    const up = new THREE.Vector3(0, 1, 0);
-    let drag: { id: number; x: number; y: number; pivot: THREE.Vector3 } | null = null;
     const turn = (dx: number, dy: number, pivot: THREE.Vector3) => {
-      const k = (2 * Math.PI / el.clientHeight) * 0.6;
+      const k = (2 * Math.PI / el.clientHeight) * 0.65;
       const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
       const q = new THREE.Quaternion().setFromAxisAngle(up, -dx * k);
       const pitch = new THREE.Quaternion().setFromAxisAngle(right, -dy * k);
       const fwd = controls.target.clone().sub(camera.position).normalize().applyQuaternion(pitch);
-      if (Math.abs(fwd.dot(up)) < 0.985) q.multiply(pitch); // stop short of looking straight up or down
+      if (Math.abs(fwd.dot(up)) < 0.985) q.multiply(pitch); // stop short of straight up or down
       camera.position.sub(pivot).applyQuaternion(q).add(pivot);
       controls.target.sub(pivot).applyQuaternion(q).add(pivot);
-      controls.update(); invalidate();
+      changed();
     };
 
-    // ---- pinch: zoom toward the point between the fingers ----
-    const touches = new Map<number, { x: number; y: number }>();
-    let pinch: { dist: number; p: THREE.Vector3 } | null = null;
-    const spread = () => { const [a, b] = [...touches.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+    // ---- wheel: mouse wheel zooms; trackpad pinch zooms; trackpad two-finger swipe moves ----
+    let wheel: { p: THREE.Vector3; t: number } | null = null;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault(); stopSpin();
+      const now = performance.now();
+      if (!wheel || now - wheel.t > 250) wheel = { p: pointAt(e.clientX, e.clientY).p, t: now };
+      wheel.t = now;
+      const px = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
+      const dx = e.deltaX * px, dy = e.deltaY * px;
+      const trackpadSwipe = !e.ctrlKey && e.deltaMode === 0 && (dx !== 0 || !Number.isInteger(e.deltaY) || Math.abs(dy) < 30);
+      if (trackpadSwipe) { pan(-dx, -dy, wheel.p); return; }
+      // ctrl+wheel is a trackpad pinch: small deltas, so it needs a bigger factor.
+      const k = e.ctrlKey ? 0.012 : 0.0028;
+      zoom(wheel.p, Math.exp(THREE.MathUtils.clamp(dy, -150, 150) * k));
+    };
+
+    // ---- pointers ----
+    const pts = new Map<number, { x: number; y: number }>();
+    let drag: { id: number; x: number; y: number; mode: 'turn' | 'pan'; p: THREE.Vector3 } | null = null;
+    let two: { dist: number; mx: number; my: number; p: THREE.Vector3 } | null = null;
+    const mid = () => { const [a, b] = [...pts.values()]; return { mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, dist: Math.hypot(a.x - b.x, a.y - b.y) }; };
 
     const onDown = (e: PointerEvent) => {
-      if (e.pointerType === 'touch') touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (touches.size === 2) {
+      stopSpin();
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      try { el.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+      if (pts.size === 2) {
         drag = null;
-        const [a, b] = [...touches.values()];
-        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-        const hit = pickHit(mx, my, el, camera);
-        if (hit) lastAnchor = hit.point;
-        pinch = { dist: spread(), p: hit ? hit.point : anchor(mx, my) };
+        const m = mid();
+        two = { ...m, p: pointAt(m.mx, m.my).p };
         return;
       }
-      if (!e.isPrimary || e.button !== 0) return;
-      const hit = pickHit(e.clientX, e.clientY, el, camera);
-      drag = { id: e.pointerId, x: e.clientX, y: e.clientY, pivot: hit ? hit.point : (lastAnchor ?? controls.target.clone()) };
-      useStore.getState().set({ spin: false });
+      if (pts.size > 2) return;
+      const panning = e.button === 2 || e.button === 1 || e.shiftKey || e.ctrlKey || e.metaKey;
+      drag = { id: e.pointerId, x: e.clientX, y: e.clientY, mode: panning ? 'pan' : 'turn', p: pointAt(e.clientX, e.clientY).p };
     };
     const onMove = (e: PointerEvent) => {
-      if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (pinch && touches.size === 2) {
-        const d = spread();
-        if (d > 0) zoom(pinch.p, pinch.dist / d);
-        pinch.dist = d;
+      if (!pts.has(e.pointerId)) return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (two && pts.size === 2) {
+        const m = mid();
+        pan(m.mx - two.mx, m.my - two.my, two.p);
+        if (m.dist > 0 && two.dist > 0) zoom(two.p, two.dist / m.dist);
+        two.mx = m.mx; two.my = m.my; two.dist = m.dist;
         return;
       }
       if (drag && e.pointerId === drag.id) {
-        turn(e.clientX - drag.x, e.clientY - drag.y, drag.pivot);
+        const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+        if (drag.mode === 'turn') turn(dx, dy, drag.p); else pan(dx, dy, drag.p);
         drag.x = e.clientX; drag.y = e.clientY;
       }
     };
     const onUp = (e: PointerEvent) => {
-      touches.delete(e.pointerId);
-      if (touches.size < 2) pinch = null;
+      pts.delete(e.pointerId);
+      if (pts.size < 2) two = null;
       if (drag && e.pointerId === drag.id) drag = null;
+      // One finger left after a two-finger gesture: carry on turning from where it is.
+      if (pts.size === 1 && !drag) {
+        const [[id, q]] = [...pts.entries()];
+        drag = { id, x: q.x, y: q.y, mode: 'turn', p: pointAt(q.x, q.y).p };
+      }
     };
+    const noMenu = (e: Event) => e.preventDefault();
 
     el.addEventListener('wheel', onWheel, { passive: false });
     el.addEventListener('pointerdown', onDown);
     el.addEventListener('pointermove', onMove);
     el.addEventListener('pointerup', onUp);
     el.addEventListener('pointercancel', onUp);
+    el.addEventListener('contextmenu', noMenu);
     return () => {
       el.removeEventListener('wheel', onWheel); el.removeEventListener('pointerdown', onDown);
-      el.removeEventListener('pointermove', onMove); el.removeEventListener('pointerup', onUp); el.removeEventListener('pointercancel', onUp);
+      el.removeEventListener('pointermove', onMove); el.removeEventListener('pointerup', onUp);
+      el.removeEventListener('pointercancel', onUp); el.removeEventListener('contextmenu', noMenu);
     };
   }, [gl, camera, controls, invalidate]);
   return null;
@@ -442,8 +485,8 @@ export function Viewer() {
         <Suspense key={id} fallback={<Loader id={id} />}><SystemModel id={id} /></Suspense>
       ) : null))}
       <LandmarkPin />
-      <OrbitControls makeDefault target={HOME.target} enableDamping dampingFactor={0.12} enableZoom={false} enableRotate={false} minDistance={0.03} maxDistance={7.5} panSpeed={0.9} autoRotate={spin} autoRotateSpeed={0.9} />
-      <ZoomToPoint />
+      <OrbitControls makeDefault target={HOME.target} enableDamping={false} enableZoom={false} enableRotate={false} enablePan={false} minDistance={0.03} maxDistance={7.5} autoRotate={spin} autoRotateSpeed={0.9} />
+      <Navigation />
       <Spin />
       <ViewOffset />
       <CameraRig />

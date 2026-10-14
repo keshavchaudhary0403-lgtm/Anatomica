@@ -20,8 +20,8 @@
   --shadow: rgba(0, 0, 0, 0.65);
   --grip: rgba(255, 255, 255, 0.25);
   --accent-text: #f2a65a;
-  --stage-pool: rgba(36, 100, 108, 0.85);
-  --stage-floor: rgba(12, 35, 41, 0.9);
+  --stage-pool: transparent;
+  --stage-floor: rgba(5, 16, 20, 0.6);
   --stage-top: #0f2c33;
   --splash-pool: #174149;
   --amber: #f2a65a;

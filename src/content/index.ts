@@ -5,6 +5,7 @@ import { ABDOMEN } from './abdomen';
 import { LOWER_LIMB } from './lower-limb';
 import { HEAD_NECK } from './head-neck';
 import { BACK } from './back';
+import { MORE } from './more';
 import type { Clinical, Region } from './types';
 
 export type { Clinical, Region };
@@ -21,6 +22,7 @@ const BY_REGION: [Region, Record<string, Clinical>][] = [
 const ALL: Record<string, Clinical> = {};
 const REGION_OF: Record<string, Region> = {};
 for (const [region, map] of BY_REGION) for (const [k, v] of Object.entries(map)) { ALL[k] = v; REGION_OF[k] = region; }
+for (const [region, map] of Object.entries(MORE) as [Region, Record<string, Clinical>][]) for (const [k, v] of Object.entries(map)) if (!ALL[k]) { ALL[k] = v; REGION_OF[k] = region; }
 // Core notes were written first; region files may extend them, so core only fills gaps.
 const CORE_REGION: Record<string, Region> = {
   Humerus: 'Upper limb', Clavicle: 'Upper limb', 'Radial nerve': 'Upper limb', 'Median nerve': 'Upper limb', 'Ulnar nerve': 'Upper limb',
@@ -47,6 +49,15 @@ const ALIAS: Record<string, string> = {
   'Superior lobe of left lung': 'Lungs',
   'Inferior lobe of left lung': 'Lungs',
   'Body of sternum': 'Manubrium of sternum',
+  'Left lobe of thymus': 'Thymus',
+  'Right lobe of thymus': 'Thymus',
+  'Neurohypophysis': 'Adenohypophysis',
+  'Iliocostalis thoracis muscle': 'Iliocostalis lumborum muscle',
+  'Longissimus thoracis muscle': 'Iliocostalis lumborum muscle',
+  'Anterior sacro-iliac ligament': 'Posterior sacro-iliac ligament',
+  'Interosseous sacro-iliac ligament': 'Posterior sacro-iliac ligament',
+  'Left renal artery': 'Right renal artery',
+  'Short head of biceps femoris': 'Long head of biceps femoris',
   'Inferior vena cava (abdominal part)': 'Inferior vena cava',
   'Inferior vena cava (thoracic part)': 'Inferior vena cava',
 };

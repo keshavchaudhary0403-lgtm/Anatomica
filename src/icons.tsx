@@ -19,4 +19,7 @@ export const Moon = () => <I d={<path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 
 export const Undo = () => <I d={<><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></>} />;
 export const Syringe = () => <I d={<><path d="m18 2 4 4M15 5l4 4M17 7l-9.5 9.5-3-3L14 4" /><path d="m4.5 13.5-2 2M7 17l-3 3M9.5 11.5l2 2" /></>} />;
 export const Cards = () => <I d={<><rect x="3.5" y="6" width="13" height="15" rx="2.5" /><path d="M8 3h10.5A2.5 2.5 0 0 1 21 5.5V17" /></>} />;
+export const Route = () => <I d={<><circle cx="6" cy="19" r="2.2" /><circle cx="18" cy="5" r="2.2" /><path d="M8 19h7.5a3.5 3.5 0 0 0 0-7h-7a3.5 3.5 0 0 1 0-7H16" /></>} />;
+export const Film = () => <I d={<><rect x="4" y="3" width="16" height="18" rx="2.5" /><path d="M12 6.5v11M9 9h6M9.5 12h5M9 15h6" /></>} />;
+export const Notebook = () => <I d={<><path d="M6 3.5h11.5A1.5 1.5 0 0 1 19 5v14a1.5 1.5 0 0 1-1.5 1.5H6Z" /><path d="M6 3.5v17M4 7.5h4M4 12h4M4 16.5h4M10.5 8.5h5M10.5 12h5" /></>} />;
 export const Rotate = () => <I d={<><ellipse cx="12" cy="12" rx="9" ry="3.6" /><path d="M12 3v18" strokeDasharray="2 2.5" /></>} />;

@@ -8,6 +8,7 @@ import type { OrbitControls as OrbitImpl } from 'three-stdlib';
 import { colorKey, MALE_ONLY, SYSTEMS, TISSUE, type ModelId, type SystemId } from './data';
 import { useStore } from './store';
 import { byId, nameOf } from './index-cache';
+import { useNotebook } from './notebook';
 
 THREE.Mesh.prototype.raycast = acceleratedRaycast;
 (THREE.BufferGeometry.prototype as any).computeBoundsTree = computeBoundsTree;
@@ -60,8 +61,54 @@ function roleMat(role: keyof typeof ROLE_COLOR, tissue: string, faint = false) {
   }
   return m;
 }
+// Targets (nerves, vessels) are thin, so their see-through copy is stronger.
 const roleOverlay = Object.fromEntries(Object.entries(ROLE_COLOR).map(([k, c]) => [k,
-  new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.2, depthTest: false, depthWrite: false, clippingPlanes: clipList })])) as Record<keyof typeof ROLE_COLOR, THREE.MeshBasicMaterial>;
+  new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: k === 'target' ? 0.6 : 0.2, depthTest: false, depthWrite: false, clippingPlanes: clipList })])) as Record<keyof typeof ROLE_COLOR, THREE.MeshBasicMaterial>;
+
+// ---------- simulated radiograph ----------
+// Additive glow that is brightest where the surface is seen edge-on, so overlapping
+// and thick structures add up like attenuation on a film. Bone is bright, air dark.
+const FILM_K: Record<string, number> = {
+  bone: 0.2, cartilage: 0.05, nail: 0.05, ligament: 0.03, tendon: 0.04, fascia: 0.012, fat: 0.008,
+  muscle: 0.028, skin: 0.02, lung: 0.006, organ: 0.035, gut: 0.03, gland: 0.03, brain: 0.03, eye: 0.02,
+  liver: 0.04, spleen: 0.035, kidney: 0.035, heart: 0.035, bladder: 0.025, uterus: 0.03, ovary: 0.03, vulva: 0.025,
+};
+const filmMats = new Map<string, THREE.ShaderMaterial>();
+function filmMat(tissue: string, selected: boolean) {
+  const k = selected ? 'sel|' + tissue : tissue;
+  let m = filmMats.get(k);
+  if (!m) {
+    const base = FILM_K[tissue] ?? 0.025;
+    m = new THREE.ShaderMaterial({
+      uniforms: { k: { value: selected ? Math.max(base, 0.06) : base }, c: { value: new THREE.Color(selected ? '#ffb46a' : '#dfeaf0') } },
+      vertexShader: `
+        #include <common>
+        #include <clipping_planes_pars_vertex>
+        varying vec3 vN; varying vec3 vV;
+        void main() {
+          #include <begin_vertex>
+          #include <project_vertex>
+          #include <clipping_planes_vertex>
+          vN = normalize(normalMatrix * normal);
+          vV = normalize(-mvPosition.xyz);
+        }`,
+      fragmentShader: `
+        #include <clipping_planes_pars_fragment>
+        uniform float k; uniform vec3 c;
+        varying vec3 vN; varying vec3 vV;
+        void main() {
+          #include <clipping_planes_fragment>
+          float f = 1.0 - abs(dot(normalize(vN), normalize(vV)));
+          gl_FragColor = vec4(c * k * (0.35 + 1.6 * f * f), 1.0);
+        }`,
+      blending: THREE.AdditiveBlending, transparent: true, depthTest: false, depthWrite: false, side: THREE.DoubleSide, clipping: true, toneMapped: false,
+    });
+    m.clippingPlanes = clipList;
+    filmMats.set(k, m);
+  }
+  return m;
+}
+const FILM_HIDE = new Set(['artery', 'vein', 'nerve', 'nucleus', 'csf', 'lymph']);
 
 // A faint amber copy of the selection drawn on top of everything, so it can be found even when covered.
 const overlayMat = new THREE.MeshBasicMaterial({ color: SELECT, transparent: true, opacity: 0.28, depthTest: false, depthWrite: false, clippingPlanes: clipList });
@@ -79,6 +126,13 @@ function applyState() {
     p.mesh.visible = show;
     if (!show) continue;
     const t = p.mesh.userData.t as string;
+    if (s.film) {
+      const sel = p.id === s.selected || quizHit;
+      p.mesh.visible = sel || !FILM_HIDE.has(t);
+      p.mesh.material = filmMat(t, sel);
+      p.mesh.renderOrder = 0;
+      continue;
+    }
     const sel = p.id === s.selected || quizHit;
     const faint = !!s.proc?.faint.has(p.id);
     p.mesh.material = sel ? mat('glow', t) : role ? roleMat(role, t, faint) : s.xray ? mat('ghost', t) : mat('base', t);
@@ -147,7 +201,7 @@ function Loader({ id }: { id: SystemId }) {
 function StateSync() {
   const invalidate = useThree((t) => t.invalidate);
   useEffect(() => useStore.subscribe((s, p) => {
-    if (s.visible !== p.visible || s.sex !== p.sex || s.selected !== p.selected || s.hidden !== p.hidden || s.isolated !== p.isolated || s.xray !== p.xray || s.section !== p.section || s.proc !== p.proc || s.quiz !== p.quiz) {
+    if (s.visible !== p.visible || s.sex !== p.sex || s.selected !== p.selected || s.hidden !== p.hidden || s.isolated !== p.isolated || s.xray !== p.xray || s.section !== p.section || s.proc !== p.proc || s.quiz !== p.quiz || s.film !== p.film) {
       applyState(); invalidate();
     }
   }), [invalidate]);
@@ -203,6 +257,11 @@ function Interaction() {
       down = null;
       if (moved > 6 || !quick) return;
       if (useStore.getState().quiz) return; // tapping would reveal the answer
+      if (useNotebook.getState().pinMode) {
+        const hit = pickHit(e.clientX, e.clientY, el, camera);
+        if (hit) useNotebook.getState().addPin(hit.id, hit.point.toArray().map((v) => +v.toFixed(4)) as [number, number, number], `Note on ${nameOf(hit.id)}`);
+        return;
+      }
       const id = pick(e.clientX, e.clientY, el, camera);
       // Touch screens do not reliably send dblclick, so detect a double tap here.
       const now = performance.now();
@@ -462,6 +521,18 @@ function Env() {
   return null;
 }
 
+function NotePins() {
+  const pins = useNotebook((s) => s.pins);
+  const show = useNotebook((s) => s.showPins);
+  const sex = useStore((s) => s.sex);
+  if (!show) return null;
+  return <>{pins.filter((p) => sex === 'female' || !p.sid.startsWith('female/')).map((p) => (
+    <Html key={p.id} position={p.p} center zIndexRange={[15, 0]}>
+      <button className="note-pin" title={p.label} onClick={() => useStore.getState().select(p.sid, true)}><span className="pin-dot" /><span className="pin-label">{p.label}</span></button>
+    </Html>
+  ))}</>;
+}
+
 function LandmarkPin() {
   const lm = useStore((s) => s.landmark);
   if (!lm) return null;
@@ -517,6 +588,7 @@ export function Viewer() {
       ) : null))}
       {sex === 'female' && <Suspense fallback={null}><SystemModel id="female" /></Suspense>}
       <LandmarkPin />
+      <NotePins />
       <OrbitControls makeDefault target={HOME.target} enableDamping={false} enableZoom={false} enableRotate={false} enablePan={false} minDistance={0.03} maxDistance={7.5} autoRotate={spin} autoRotateSpeed={0.9} />
       <Navigation />
       <Spin />

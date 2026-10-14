@@ -14,6 +14,7 @@ const DIRS: Record<Procedure['view'], [number, number, number]> = {
   'back-right': [-0.7, 0.2, -0.7],
 };
 
+export { DIRS };
 export const idOf = (r: Ref) => resolve(r.n, r.s, useStore.getState().sex)?.id ?? null;
 
 function frame(ids: string[], view: Procedure['view']) {
@@ -39,11 +40,11 @@ export function startProcedure(id: string) {
   const before = st.proc?.before ?? st.visible;
   const visible = Object.fromEntries(Object.keys(st.visible).map((k) => [k, systems.has(k as SystemId)])) as typeof st.visible;
   st.set({
-    proc: { id, step: 0, roles, faint, context: new Set(p.context), before },
+    proc: { kind: 'procedure', id, step: 0, roles, faint, context: new Set(p.context), before },
     visible, selected: null, isolated: null, hidden: new Set(), hideLog: [], xray: false,
     section: { ...st.section, on: false }, quiz: null, spin: false,
   });
-  frame(framing(roles, faint), p.view);
+  frame(p.frame ? p.frame.map(idOf).filter((x): x is string => !!x) : framing(roles, faint), p.view);
 }
 
 // Frame the targets; landmarks, risks and faint sheets give context around them.
@@ -57,19 +58,20 @@ function framing(roles: Map<string, Role>, faint: Set<string>) {
 
 export function goToStep(i: number) {
   const st = useStore.getState();
-  if (!st.proc) return;
+  if (!st.proc || st.proc.kind !== 'procedure') return;
   const p = PROCEDURES.find((x) => x.id === st.proc!.id)!;
   const step = Math.max(0, Math.min(p.steps.length - 1, i));
   st.set({ proc: { ...st.proc, step }, selected: null });
   const f = p.steps[step].focus;
   const fid = f ? idOf(f) : null;
-  frame(fid ? [fid] : framing(st.proc.roles, st.proc.faint), p.view);
+  const whole = p.frame ? p.frame.map(idOf).filter((x): x is string => !!x) : framing(st.proc.roles, st.proc.faint);
+  frame(fid ? [fid] : whole, p.view);
 }
 
 export function endProcedure() {
   const st = useStore.getState();
   if (!st.proc) return;
-  st.set({ visible: st.proc.before, proc: null, focusList: null, focusDir: null });
+  st.set({ visible: st.proc.before, proc: null, focusList: null, focusDir: null, landmark: null });
   st.set({ resetReq: st.resetReq + 1 });
 }
 

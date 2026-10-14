@@ -15,6 +15,7 @@ interface State {
   hideLog: string[]; // order of hides, for undo
   isolated: Set<string> | null;
   xray: boolean;
+  film: boolean;
   spin: boolean;
   sex: Sex;
   section: { on: boolean; axis: Axis; pos: number; flip: boolean };
@@ -22,7 +23,7 @@ interface State {
   focusReq: number; // bump to fly camera to selection
   focusList: string[] | null; // when set, frame these instead of the selection
   focusDir: [number, number, number] | null; // and look from this direction
-  proc: { id: string; step: number; roles: Map<string, Role>; faint: Set<string>; context: Set<SystemId>; before: Record<SystemId, boolean> } | null;
+  proc: { kind: 'procedure' | 'pathway'; id: string; step: number; roles: Map<string, Role>; faint: Set<string>; context: Set<SystemId>; before: Record<SystemId, boolean> } | null;
   quiz: { highlight: string | null } | null;
   partsV: number; // bumps when a system's meshes finish loading
   resetReq: number;
@@ -54,6 +55,7 @@ export const useStore = create<State>((set, get) => ({
   hideLog: [],
   isolated: null,
   xray: false,
+  film: false,
   spin: false,
   sex: (() => { try { return localStorage.getItem('anatomica.sex') === 'female' ? 'female' : 'male'; } catch { return 'male'; } })() as Sex,
   section: { on: false, axis: 'y', pos: 0.5, flip: false },

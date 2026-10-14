@@ -14,7 +14,10 @@ Clinical 3D anatomy for an MBBS intern: the whole body in layers, with clinical 
 - **X-ray** fades everything except the selection. **Section** cuts the body axially, sagittally or coronally.
 - **Isolate** shows only the selected structure; **Show all** brings everything back.
 - **Saved views** (bookmark icon) keep the angle, layers and selection.
-- **Procedures** (dock): 13 bedside procedures. Each shows the target (amber), landmarks (teal) and structures at risk (red) on the model, with steps and common mistakes.
+- **Radiograph** (dock): renders the body like an X-ray film (simulated from the model, not real imaging). **See-through** fades everything except the selection.
+- **Pathways** (dock): 9 nerves and 2 arterial trees. Pick the level of a lesion to see the pinned site, the paralysed muscles or territory at risk, collaterals, signs and causes.
+- **My notebook** (top bar): personal notes on any structure (card → My notes), pins placed on the model, and a ward case log. Back up / Restore moves it between devices.
+- **Procedures** (dock): 20 bedside procedures and nerve blocks. Each shows the target (amber), landmarks (teal) and structures at risk (red) on the model, with steps and common mistakes.
 - **Revise** (dock): identify-the-structure questions and NEET PG style MCQs by region, with spaced repetition. Progress is kept on the device.
 
 ## Develop
@@ -33,7 +36,9 @@ Deploy: import the repo in Vercel (framework preset: Vite). No server or keys ne
 - `public/data/structures.json` — every structure with its system, tissue, group and landmarks.
 - `public/data/descriptions.json` — short overviews, built by `tools/build-descriptions.mjs`.
 - `src/content/*.ts` — clinical and NEET PG notes by region, keyed by structure name. Muscle parts ("Long head of biceps brachii") share their muscle's entry automatically. These are drafts and should be checked against BD Chaurasia or Gray's.
-- `src/content/procedures.ts` — procedure guides.
+- `src/content/more.ts` — second batch of notes.
+- `src/content/procedures.ts` — procedure guides and nerve blocks.
+- `src/content/pathways.ts` — nerve and artery pathways with lesion levels.
 - `src/content/questions.ts` — MCQs.
 
 ### Rebuilding the models

@@ -3,6 +3,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Card } from './Card';
 import { ProcedurePanel, ProcedurePicker } from './ProcedurePanel';
 import { QuizPanel } from './QuizPanel';
+import { PathwayPanel, PathwayPicker } from './PathwayPanel';
+import { Guard, NotebookPanel } from './NotebookPanel';
+import { useNotebook } from './notebook';
 import { SYSTEMS, type Structure } from './data';
 import * as Icon from './icons';
 import { ready } from './index-cache';
@@ -125,8 +128,9 @@ function Views() {
   );
 }
 
-function Dock({ onProcedures }: { onProcedures: () => void }) {
+function Dock({ onProcedures, onPathways }: { onProcedures: () => void; onPathways: () => void }) {
   const xray = useStore((s) => s.xray);
+  const film = useStore((s) => s.film);
   const spin = useStore((s) => s.spin);
   const section = useStore((s) => s.section);
   const proc = useStore((s) => s.proc);
@@ -135,11 +139,13 @@ function Dock({ onProcedures }: { onProcedures: () => void }) {
   return (
     <div className="dock" role="toolbar" aria-label="View tools">
       <button onClick={() => st().set({ resetReq: st().resetReq + 1 })}><Icon.Reset /><span>Reset</span></button>
-      <button className={xray ? 'on' : ''} aria-pressed={xray} onClick={() => st().set({ xray: !xray })}><Icon.Xray /><span>X-ray</span></button>
+      <button className={xray ? 'on' : ''} aria-pressed={xray} onClick={() => st().set({ xray: !xray, film: false })} title="Fade everything except the selection"><Icon.Xray /><span>See-through</span></button>
+      <button className={film ? 'on' : ''} aria-pressed={film} onClick={() => st().set({ film: !film, xray: false })} title="Simulated radiograph"><Icon.Film /><span>Radiograph</span></button>
       <button className={section.on ? 'on' : ''} aria-pressed={section.on} onClick={() => st().set({ section: { ...section, on: !section.on } })}><Icon.Slice /><span>Section</span></button>
       <button className={spin ? 'on' : ''} aria-pressed={spin} onClick={() => st().set({ spin: !spin })}><Icon.Rotate /><span>Turn</span></button>
       <span className="dock-sep" aria-hidden="true" />
-      <button className={proc ? 'on' : ''} onClick={onProcedures}><Icon.Syringe /><span>Procedures</span></button>
+      <button className={proc?.kind === 'procedure' ? 'on' : ''} onClick={onProcedures}><Icon.Syringe /><span>Procedures</span></button>
+      <button className={proc?.kind === 'pathway' ? 'on' : ''} onClick={onPathways}><Icon.Route /><span>Pathways</span></button>
       <button className={quiz ? 'on' : ''} aria-pressed={!!quiz} onClick={() => st().set(quiz ? { quiz: null, focusList: null } : { quiz: { highlight: null }, selected: null })}><Icon.Cards /><span>Revise</span></button>
     </div>
   );
@@ -159,6 +165,26 @@ function FilterBar() {
       <span>{iso ? `Showing only ${nameOf(iso)}` : hidden.size === 1 && last ? `${nameOf(last)} hidden` : `${hidden.size} structures hidden`}</span>
       {!iso && last && <button className="undo" onClick={() => st.undoHide()}>Undo</button>}
       <button className="all" onClick={() => st.showAll()}>Show all</button>
+    </div>
+  );
+}
+
+function NotebookButton({ onOpen }: { onOpen: () => void }) {
+  const count = useNotebook((s) => s.cases.length + Object.keys(s.notes).length);
+  return (
+    <button className="icon-btn badge-host" onClick={onOpen} aria-label="My notebook" title="My notebook">
+      <Icon.Notebook />{count > 0 && <span className="badge">{count}</span>}
+    </button>
+  );
+}
+
+function PinHint() {
+  const on = useNotebook((s) => s.pinMode);
+  if (!on) return null;
+  return (
+    <div className="filter-bar" role="status">
+      <span>Tap the exact spot on the model to place a pin</span>
+      <button className="undo" onClick={() => useNotebook.getState().set({ pinMode: false })}>Cancel</button>
     </div>
   );
 }
@@ -183,16 +209,18 @@ export default function App() {
   const [list, setList] = useState<Structure[]>([]);
   const skeletonLoading = useStore((s) => s.loading.skeleton);
   const selected = useStore((s) => s.selected);
+  const film = useStore((s) => s.film);
   const proc = useStore((s) => s.proc);
   const quiz = useStore((s) => s.quiz);
-  const [picking, setPicking] = useState(false);
+  const [picking, setPicking] = useState<null | 'proc' | 'path'>(null);
+  const [notebook, setNotebook] = useState(false);
   useEffect(() => { ready.then(setList); }, []);
-  const panel = quiz ? 'quiz' : selected ? 'card' : proc ? 'proc' : null;
+  const panel = quiz ? 'quiz' : selected ? 'card' : proc ? proc.kind : null;
   const done = list.length > 0 && skeletonLoading === false;
   const touch = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
 
   return (
-    <div className={`app${panel ? ' has-card' : ''}`}>
+    <div className={`app${panel ? ' has-card' : ''}${film ? ' film' : ''}`}>
       <div className="stage" aria-hidden="true" />
       {list.length > 0 && <Viewer />}
       <header className="top">
@@ -200,16 +228,23 @@ export default function App() {
         <button className="search-pill" onClick={() => useStore.getState().set({ searchOpen: true })}>
           <Icon.Search /><span>Search structures</span><kbd>⌘K</kbd>
         </button>
-        <div className="top-right"><ThemeButton /><Views /></div>
+        <div className="top-right"><ThemeButton /><NotebookButton onOpen={() => setNotebook(true)} /><Views /></div>
       </header>
       <Layers />
-      {panel === 'card' && <Card />}
-      {panel === 'proc' && <ProcedurePanel />}
-      {panel === 'quiz' && <QuizPanel />}
+      <Guard key={panel ?? 'none'} onReset={() => useStore.getState().set({ selected: null, quiz: null, proc: null })}>
+        {panel === 'card' && <Card />}
+        {panel === 'procedure' && <ProcedurePanel />}
+        {panel === 'pathway' && <PathwayPanel />}
+        {panel === 'quiz' && <QuizPanel />}
+      </Guard>
       <FilterBar />
+      <PinHint />
+      {film && !panel && <p className="film-note">Simulated radiograph from the 3D model, not a real X-ray. Turn on Skin and Organs for soft-tissue shadows.</p>}
       <SectionPanel />
-      <Dock onProcedures={() => setPicking(true)} />
-      {picking && <ProcedurePicker onClose={() => setPicking(false)} />}
+      <Dock onProcedures={() => setPicking('proc')} onPathways={() => setPicking('path')} />
+      {picking === 'proc' && <ProcedurePicker onClose={() => setPicking(null)} />}
+      {picking === 'path' && <PathwayPicker onClose={() => setPicking(null)} />}
+      {notebook && <Guard onReset={() => setNotebook(false)}><NotebookPanel onClose={() => setNotebook(false)} /></Guard>}
       {!panel && done && <p className="hint">{touch ? 'Drag to turn. Pinch to zoom, two fingers to move.' : 'Drag to turn. Scroll to zoom. Right-drag or two-finger swipe to move.'}</p>}
       <Hover />
       <Search list={list} />

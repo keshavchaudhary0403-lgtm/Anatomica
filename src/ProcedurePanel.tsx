@@ -36,7 +36,7 @@ export function ProcedurePicker({ onClose }: { onClose: () => void }) {
 export function ProcedurePanel() {
   const proc = useStore((s) => s.proc);
   const [tall, setTall] = useState(false);
-  if (!proc) return null;
+  if (!proc || proc.kind !== 'procedure') return null;
   const p = PROCEDURES.find((x) => x.id === proc.id)!;
   const step = p.steps[proc.step];
   const groups = (['target', 'landmark', 'risk'] as Role[]).map((role) => ({

@@ -11,6 +11,8 @@ export interface Procedure {
   context: SystemId[];
   /** Which way the camera looks from: the side of the patient you stand on. */
   view: 'front' | 'back' | 'right' | 'left' | 'front-right' | 'back-right';
+  /** Structures to frame the camera on, when the targets are long (whole nerves). */
+  frame?: Ref[];
   /** Switches the body to this sex when the procedure starts. */
   sex?: 'male' | 'female';
   /** faint: drawn as a light tint (for large sheets like the pleura). */
@@ -371,5 +373,152 @@ export const PROCEDURES: Procedure[] = [
       { title: 'Scalpel-bougie-tube', text: 'Stab incision through the membrane, rotate the blade 90°, slide a bougie in, then a 6.0 cuffed tube over it.', focus: N('Cricoid cartilage') },
     ],
     mistakes: ['Going too low through the thyroid isthmus, which bleeds.', 'Delaying the decision while oxygen saturation falls.'],
+  },
+  // ---------- nerve blocks ----------
+  {
+    id: 'digital-block',
+    title: 'Digital (ring) block',
+    summary: 'Four small injections at the base of the finger, one for each digital nerve.',
+    frame: [R('Proximal phalanx of third finger of hand')],
+    context: ['skeleton'],
+    view: 'front-right',
+    roles: [
+      { ref: R('Proper palmar digital branches of median nerve'), role: 'target' },
+      { ref: R('Proper palmar digital branches of ulnar nerve'), role: 'target' },
+      { ref: R('Dorsal digital branches of radial nerve'), role: 'target' },
+      { ref: R('Proximal phalanx of third finger of hand'), role: 'landmark' },
+      { ref: R('Proper palmar digital arteries'), role: 'risk' },
+    ],
+    steps: [
+      { title: 'Indication', text: 'Repair of finger lacerations, nail bed injuries, paronychia drainage, reduction of finger dislocations.' },
+      { title: 'Nerves', text: 'Each finger has two palmar digital nerves (anterolateral and anteromedial) and two smaller dorsal nerves, running beside the phalanx with the digital arteries.', focus: R('Proximal phalanx of third finger of hand') },
+      { title: 'Inject', text: 'At the base of the proximal phalanx, insert from the dorsal side on each side of the bone. Inject 1 ml dorsally, then advance towards the palm and inject 1 ml more. Repeat on the other side.', focus: R('Proximal phalanx of third finger of hand') },
+      { title: 'Wait', text: 'Allow 5–10 minutes. Check that the fingertip is numb before starting.' },
+    ],
+    mistakes: [
+      'Using a large volume circumferentially, which can compress the digital arteries.',
+      'Injecting into the digital artery: always aspirate first.',
+      'Plain lidocaine is standard; adrenaline-containing solutions are considered safe in healthy fingers but avoid them in peripheral vascular disease.',
+    ],
+  },
+  {
+    id: 'wrist-block',
+    title: 'Wrist block (median and ulnar)',
+    summary: 'Median nerve between palmaris longus and FCR; ulnar nerve under FCU, beside the ulnar artery.',
+    frame: [R('Pronator quadratus')],
+    context: ['skeleton'],
+    view: 'front-right',
+    roles: [
+      { ref: R('Median nerve'), role: 'target' },
+      { ref: R('Ulnar nerve'), role: 'target' },
+      { ref: R('Palmaris longus muscle'), role: 'landmark' },
+      { ref: R('Flexor carpi radialis'), role: 'landmark' },
+      { ref: R('Ulnar head of flexor carpi ulnaris'), role: 'landmark' },
+      { ref: R('Ulnar artery'), role: 'risk' },
+      { ref: R('Radial artery'), role: 'risk' },
+    ],
+    steps: [
+      { title: 'Median nerve', text: 'At the proximal wrist crease, insert between the tendons of palmaris longus and flexor carpi radialis, about 1 cm deep, just through the deep fascia. Inject 3–5 ml.', focus: R('Pronator quadratus') },
+      { title: 'Ulnar nerve', text: 'Insert from the ulnar side, under the flexor carpi ulnaris tendon, aiming towards the radius. The ulnar artery lies just lateral to the nerve: aspirate first. Inject 3–5 ml.', focus: R('Pronator quadratus') },
+      { title: 'Dorsal branches', text: 'A subcutaneous wheal across the back of the wrist blocks the superficial radial nerve and the dorsal branch of the ulnar nerve.' },
+    ],
+    mistakes: ['Injecting into the nerve: stop if the patient feels sharp shooting pain.', 'Missing the ulnar artery on aspiration.'],
+  },
+  {
+    id: 'axillary-block',
+    title: 'Axillary brachial plexus block',
+    summary: 'Around the axillary artery: median, ulnar and radial nerves, plus the musculocutaneous in coracobrachialis.',
+    frame: [R('Axillary artery'), R('Coracobrachialis muscle')],
+    context: ['skeleton'],
+    view: 'front-right',
+    roles: [
+      { ref: R('Median nerve'), role: 'target' },
+      { ref: R('Ulnar nerve'), role: 'target' },
+      { ref: R('Radial nerve'), role: 'target' },
+      { ref: R('Musculocutaneous nerve'), role: 'target' },
+      { ref: R('Coracobrachialis muscle'), role: 'landmark' },
+      { ref: R('Axillary artery'), role: 'risk' },
+      { ref: R('Axillary vein'), role: 'risk' },
+    ],
+    steps: [
+      { title: 'Position', text: 'Arm abducted to 90°, elbow flexed, hand behind the head. Feel the axillary pulse high in the axilla.' },
+      { title: 'Find the nerves', text: 'With ultrasound: median nerve usually lateral and superficial to the artery, ulnar medial, radial behind it. The musculocutaneous nerve lies in or near coracobrachialis.', focus: R('Axillary artery') },
+      { title: 'Inject', text: 'Deposit local anaesthetic around each nerve separately, then block the musculocutaneous nerve in coracobrachialis.', focus: R('Coracobrachialis muscle') },
+    ],
+    mistakes: ['Forgetting the musculocutaneous nerve: lateral forearm stays sensitive.', 'Intravascular injection; always aspirate and inject in small aliquots.'],
+  },
+  {
+    id: 'interscalene-block',
+    title: 'Interscalene block',
+    summary: 'Brachial plexus roots and trunks between scalenus anterior and medius, at C6. For shoulder surgery.',
+    frame: [R('Scalenus anterior muscle'), R('Superior trunk of brachial plexus')],
+    context: ['skeleton'],
+    view: 'front-right',
+    roles: [
+      { ref: R('Superior trunk of brachial plexus'), role: 'target' },
+      { ref: R('Middle trunk of brachial plexus'), role: 'target' },
+      { ref: R('Roots of brachial plexus'), role: 'target' },
+      { ref: R('Scalenus anterior muscle'), role: 'landmark', faint: true },
+      { ref: R('Scalenus medius muscle'), role: 'landmark', faint: true },
+      { ref: R('Sternocleidomastoid muscle'), role: 'landmark', faint: true },
+      { ref: R('External jugular vein'), role: 'risk' },
+      { ref: R('Vertebral artery'), role: 'risk' },
+    ],
+    steps: [
+      { title: 'Landmarks', text: 'At the level of the cricoid cartilage (C6), roll fingers off the posterior border of sternocleidomastoid onto scalenus anterior, then into the interscalene groove.', focus: R('Scalenus anterior muscle') },
+      { title: 'Ultrasound', text: 'The roots look like a vertical "traffic light" of round dark circles between the two scalene muscles.', focus: R('Superior trunk of brachial plexus') },
+      { title: 'Inject', text: 'Small volume (10–15 ml) around the C5–C6 roots under direct vision.' },
+    ],
+    mistakes: [
+      'Expect phrenic nerve block (almost always): avoid in patients with poor lung function.',
+      'Horner syndrome and hoarseness can occur and wear off.',
+      'Injection into the vertebral artery or epidural / intrathecal space is a serious complication.',
+    ],
+  },
+  {
+    id: 'femoral-block',
+    title: 'Femoral nerve / fascia iliaca block',
+    summary: 'For hip fractures: lateral to the femoral artery, below the inguinal ligament, deep to the fascia iliaca.',
+    frame: [R('Inguinal ligament')],
+    context: ['skeleton'],
+    view: 'front-right',
+    roles: [
+      { ref: R('Femoral nerve'), role: 'target' },
+      { ref: R('Lateral femoral cutaneous nerve'), role: 'target' },
+      { ref: R('Inguinal ligament'), role: 'landmark' },
+      { ref: R('Iliacus muscle'), role: 'landmark', faint: true },
+      { ref: R('Femoral artery'), role: 'risk' },
+      { ref: R('Femoral vein'), role: 'risk' },
+    ],
+    steps: [
+      { title: 'Femoral nerve block', text: 'Feel the femoral pulse just below the inguinal ligament. Insert 1–2 cm lateral to it; the nerve lies deep to the fascia iliaca.', focus: R('Femoral nerve') },
+      { title: 'Fascia iliaca block', text: 'Divide the inguinal ligament into thirds. Insert 1–2 cm below the junction of the lateral and middle thirds, feel two "pops" (fascia lata, fascia iliaca), then inject 20–30 ml.', focus: R('Inguinal ligament') },
+      { title: 'Spread', text: 'The anaesthetic spreads under the fascia iliaca to the femoral and lateral femoral cutaneous nerves (and sometimes the obturator).', focus: R('Lateral femoral cutaneous nerve') },
+    ],
+    mistakes: ['Injecting medially into the femoral artery or vein.', 'Not checking the maximum safe dose of local anaesthetic for the patient\'s weight.'],
+  },
+  {
+    id: 'ankle-block',
+    title: 'Ankle block',
+    summary: 'Five nerves around the ankle: tibial, deep fibular, superficial fibular, saphenous and sural.',
+    frame: [R('Calcaneal tendon'), R('Dorsalis pedis artery')],
+    context: ['skeleton'],
+    view: 'front-right',
+    roles: [
+      { ref: R('Tibial nerve'), role: 'target' },
+      { ref: R('Deep fibular nerve'), role: 'target' },
+      { ref: R('Superficial fibular nerve'), role: 'target' },
+      { ref: R('Saphenous nerve'), role: 'target' },
+      { ref: R('Sural nerve'), role: 'target' },
+      { ref: R('Posterior tibial artery'), role: 'risk' },
+      { ref: R('Dorsalis pedis artery'), role: 'risk' },
+      { ref: R('Calcaneal tendon'), role: 'landmark' },
+    ],
+    steps: [
+      { title: 'Tibial nerve', text: 'Behind the medial malleolus, just behind the posterior tibial pulse. Supplies most of the sole.', focus: R('Calcaneal tendon') },
+      { title: 'Deep fibular nerve', text: 'On the front of the ankle, beside the dorsalis pedis artery, between the extensor hallucis longus and extensor digitorum longus tendons. First web space.', focus: R('Dorsalis pedis artery') },
+      { title: 'Superficial nerves', text: 'A subcutaneous ring from the medial to the lateral malleolus across the front of the ankle blocks the superficial fibular and saphenous nerves; between the lateral malleolus and calcaneal tendon blocks the sural nerve.', focus: R('Calcaneal tendon') },
+    ],
+    mistakes: ['Missing the tibial nerve, which supplies most of the sole.', 'Injecting into the posterior tibial artery.'],
   },
 ];

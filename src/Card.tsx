@@ -4,13 +4,16 @@ import { loadDescriptions, SYSTEMS, TISSUE } from './data';
 import * as Icon from './icons';
 import { byId } from './index-cache';
 import { useStore } from './store';
+import { MyNotes } from './NotebookPanel';
+import { useNotebook } from './notebook';
 
-type Tab = 'clinical' | 'overview' | 'landmarks';
+type Tab = 'clinical' | 'overview' | 'landmarks' | 'mine';
 
 export function Card() {
   const selected = useStore((s) => s.selected);
   const landmark = useStore((s) => s.landmark);
   const isolated = useStore((s) => s.isolated);
+  const notes = useNotebook((st) => st.notes);
   const [desc, setDesc] = useState<Record<string, { t: string; u: string }>>({});
   const [tab, setTab] = useState<Tab>('overview');
   const [tall, setTall] = useState(false);
@@ -25,11 +28,13 @@ export function Card() {
   const d = desc[s.dkey];
   const sys = SYSTEMS.find((x) => x.id === (s.layer ?? s.sys))!;
   const st = useStore.getState();
+  const hasNote = !!notes[s.name];
   const isolatedHere = !!isolated?.has(s.id);
   const tabs: [Tab, string, boolean][] = [
     ['clinical', 'Clinical', !!clin],
     ['overview', 'Overview', true],
     ['landmarks', `Landmarks${s.lm.length ? ` ${s.lm.length}` : ''}`, s.lm.length > 0],
+    ['mine', hasNote ? 'My notes •' : 'My notes', true],
   ];
 
   return (
@@ -85,6 +90,7 @@ export function Card() {
             </>
           ) : <p className="muted">No overview for this structure yet. Clinical notes are added region by region.</p>
         )}
+        {tab === 'mine' && <MyNotes name={s.name} sid={s.id} />}
         {tab === 'landmarks' && (
           <ul className="lm">
             {s.lm.map((l) => (

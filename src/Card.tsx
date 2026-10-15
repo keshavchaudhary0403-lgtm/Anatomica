@@ -95,7 +95,7 @@ export function Card() {
           <ul className="lm">
             {s.lm.map((l) => (
               <li key={l.n}>
-                <button className={landmark?.n === l.n ? 'on' : ''} onClick={() => st.set({ landmark: landmark?.n === l.n ? null : l })}>{l.n}</button>
+                <button className={landmark?.n === l.n ? 'on' : ''} onClick={() => st.set(landmark?.n === l.n ? { landmark: null } : { landmark: l, lmFocus: st.lmFocus + 1 })}>{l.n}</button>
               </li>
             ))}
           </ul>

@@ -108,7 +108,9 @@ export function loadStructures() {
       // The source drops a closing bracket: "Facial nerve (VII" -> "Facial nerve (VII)".
       if ((s.name.match(/\(/g) || []).length > (s.name.match(/\)/g) || []).length) s.name += ')';
     }
-    // Z-Anatomy labels mostly the right side; mirror landmarks onto the left partner.
+    // A landmark that only repeats the structure's own name adds nothing.
+    for (const s of list) s.lm = s.lm.filter((l) => l.n.toLowerCase() !== s.name.toLowerCase());
+    // Z-Anatomy labels mostly the right side; mirror landmarks onto the left partner when missing.
     const byName = new Map<string, Structure>();
     for (const s of list) if (s.side === 'right') byName.set(`${s.sys}/${s.name}`, s);
     for (const s of list) {

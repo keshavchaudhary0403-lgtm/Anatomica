@@ -21,6 +21,7 @@ interface State {
   section: { on: boolean; axis: Axis; pos: number; flip: boolean };
   landmark: Landmark | null;
   focusReq: number; // bump to fly camera to selection
+  lmFocus: number; // bump to bring the current landmark into view
   focusList: string[] | null; // when set, frame these instead of the selection
   focusDir: [number, number, number] | null; // and look from this direction
   proc: { kind: 'procedure' | 'pathway'; id: string; step: number; roles: Map<string, Role>; faint: Set<string>; context: Set<SystemId>; before: Record<SystemId, boolean> } | null;
@@ -61,6 +62,7 @@ export const useStore = create<State>((set, get) => ({
   section: { on: false, axis: 'y', pos: 0.5, flip: false },
   landmark: null,
   focusReq: 0,
+  lmFocus: 0,
   focusList: null,
   focusDir: null,
   proc: null,

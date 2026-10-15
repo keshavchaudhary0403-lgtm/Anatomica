@@ -475,6 +475,16 @@ function CameraRig() {
     fly(sphere.center.clone(), sphere.center.clone().add(dir.multiplyScalar(dist)));
   }, [focusReq, partsV, controls]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (resetReq) fly(HOME.target.clone(), HOME.cam.clone()); }, [resetReq]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Picking a landmark turns the view to it: same viewing direction, centred on the point.
+  const lmFocus = useStore((s) => s.lmFocus);
+  useEffect(() => {
+    const lm = useStore.getState().landmark;
+    if (!lmFocus || !lm || !controls) return;
+    const p = new THREE.Vector3(...lm.p);
+    const dir = camera.position.clone().sub(controls.target).normalize();
+    const dist = THREE.MathUtils.clamp(camera.position.distanceTo(controls.target), 0.35, 0.9);
+    fly(p, p.clone().add(dir.multiplyScalar(dist)));
+  }, [lmFocus]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     viewApi.get = () => (controls ? { cam: camera.position.toArray(), target: controls.target.toArray() } : null);
     viewApi.go = (cam, target) => fly(new THREE.Vector3(...target), new THREE.Vector3(...cam));

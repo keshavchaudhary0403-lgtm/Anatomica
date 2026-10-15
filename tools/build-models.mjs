@@ -77,17 +77,50 @@ for (const sys of SYSTEMS) {
   const meshAncestor = (n) => { let p = parentOf.get(n); while (p && !(p.getMesh() && !LABEL.test(p.getName()))) p = parentOf.get(p); return p; };
   const groupPath = (n) => { const out = []; let p = parentOf.get(n); while (p) { if (GROUP.test(p.getName())) out.unshift(clean(p.getName())); p = parentOf.get(p); } return out; };
 
-  // 1. Collect landmarks (.t / .s anchors) for each structure.
+  // 1. Collect landmarks. Each landmark is a text node (.t right, .s left) placed away from the
+  //    body, with a leader line (.j / .i) running from the text to the point. The point is the
+  //    line's far end; we then snap it onto the structure's surface.
+  const worldVerts = (node) => {
+    const out = [];
+    const m = node.getMesh(); if (!m) return out;
+    const w = node.getWorldMatrix();
+    for (const prim of m.listPrimitives()) {
+      const pos = prim.getAttribute('POSITION'); const v = [0, 0, 0];
+      for (let i = 0; i < pos.getCount(); i++) {
+        pos.getElement(i, v);
+        out.push([w[0] * v[0] + w[4] * v[1] + w[8] * v[2] + w[12], w[1] * v[0] + w[5] * v[1] + w[9] * v[2] + w[13], w[2] * v[0] + w[6] * v[1] + w[10] * v[2] + w[14]]);
+      }
+    }
+    return out;
+  };
+  const d2 = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
+  const ownerVerts = new Map();
   const landmarks = new Map();
+  let snapped = 0, total = 0;
   for (const n of root.listNodes()) {
     if (!/\.(t|s)$/.test(n.getName())) continue;
     const owner = meshAncestor(n);
     if (!owner) continue;
-    const p = n.getWorldTranslation();
+    const label = n.getWorldTranslation();
+    const line = n.listChildren().find((c) => /\.(j|i)$/.test(c.getName()) && c.getMesh());
+    let p = label;
+    if (line) {
+      const lv = worldVerts(line);
+      if (lv.length) p = lv.reduce((best, v) => (d2(v, label) > d2(best, label) ? v : best), lv[0]);
+    }
+    // Snap onto the nearest surface vertex of the structure when the line ends just short of it.
+    if (!ownerVerts.has(owner)) ownerVerts.set(owner, worldVerts(owner));
+    const ov = ownerVerts.get(owner);
+    if (ov.length) {
+      const near = ov.reduce((best, v) => (d2(v, p) < d2(best, p) ? v : best), ov[0]);
+      if (d2(near, p) < 0.012 ** 2) { p = near; snapped++; }
+    }
+    total++;
     const name = n.getName().replace(/\.(t|s)$/, '').replace(/^\(|\)$/g, '');
     if (!landmarks.has(owner)) landmarks.set(owner, []);
     landmarks.get(owner).push({ n: name, p: p.map((v) => +v.toFixed(4)) });
   }
+  console.log(sys.id, 'landmarks', total, 'snapped to surface', snapped);
 
   // 2. Tag every anatomical mesh with id, tissue and group path.
   const tissueMats = new Map();

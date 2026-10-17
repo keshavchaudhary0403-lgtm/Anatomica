@@ -29,7 +29,11 @@ const ATTACH = /\.(o|e)\d*[lr]?$/;
 const GROUP = /\.g$/;
 
 const MUSCLE = /^(External rotation|Abductor|Adductor|Flexion|Levator|Internal rotator|Extension|Superficial|Orbicularis\/Constrictor|Depressor|Ingestion|Biarticular|Masticator|Phonation|Diaphragm|Flexion hand\/foot|Flexion fingers|Extensor extremities|Trapezius|Extension hand\/foot|Origin|End)/;
+const TISSUES = new Set(['bone', 'cartilage', 'ligament', 'tendon', 'fascia', 'fat', 'artery', 'vein', 'nerve', 'brain', 'nucleus', 'csf', 'eye', 'lung', 'gut', 'organ', 'gland', 'lymph', 'skin', 'nail', 'muscle']);
 function tissueOf(mat, sys) {
+  // Left and right often share one mesh: by the time the second side is read, its material
+  // already carries our tissue name. Keep it rather than falling back to the system default.
+  if (TISSUES.has(mat)) return mat;
   const m = (mat || '').replace(/(\.\d+)+$/, '').replace(/-\d+'*$/, '').replace(/'+$/, '');
   if (/^(Bone|Suture)/.test(m)) return 'bone';
   if (m === 'Cartilage') return 'cartilage';
